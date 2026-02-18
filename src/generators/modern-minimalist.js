@@ -524,67 +524,6 @@ function generateBasketweave(w, h, rng, density) {
   return { lines, circles: [], arcs: [] };
 }
 
-function generatePicket(w, h, rng, density) {
-  const lines = [];
-  const circles = [];
-  const arcs = [];
-  const hexW = Math.min(w, h) * (0.04 + (1 - density) * 0.06);
-  const hexH = hexW * 2.5;
-  const variation = rng() < 0.5 ? "pointed" : "rounded";
-  const webWidth = hexW * 0.12;
-
-  const cols = Math.ceil(w / hexW) + 2;
-  const rows = Math.ceil(h / (hexH * 0.75)) + 2;
-
-  for (let r = -1; r < rows; r++) {
-    for (let c = -1; c < cols; c++) {
-      const cx = c * hexW + (r % 2 ? hexW * 0.5 : 0);
-      const cy = r * hexH * 0.75;
-      const hw = hexW * 0.5 - webWidth / 2;
-      const hh = hexH * 0.5 - webWidth / 2;
-      const tipH = hexH * 0.2;
-
-      if (variation === "rounded") {
-        // Capsule shape — straight sides with semicircular ends
-        const bodyH = hh - tipH;
-        // Left side
-        lines.push([cx - hw, cy - bodyH, cx - hw, cy + bodyH]);
-        // Right side
-        lines.push([cx + hw, cy - bodyH, cx + hw, cy + bodyH]);
-        // Top arc (approximated with segments)
-        const segs = 8;
-        for (let s = 0; s < segs; s++) {
-          const a1 = Math.PI + (Math.PI * s) / segs;
-          const a2 = Math.PI + (Math.PI * (s + 1)) / segs;
-          lines.push([
-            cx + hw * Math.cos(a1), cy - bodyH + hw * Math.sin(a1),
-            cx + hw * Math.cos(a2), cy - bodyH + hw * Math.sin(a2)
-          ]);
-        }
-        // Bottom arc
-        for (let s = 0; s < segs; s++) {
-          const a1 = (Math.PI * s) / segs;
-          const a2 = (Math.PI * (s + 1)) / segs;
-          lines.push([
-            cx + hw * Math.cos(a1), cy + bodyH + hw * Math.sin(a1),
-            cx + hw * Math.cos(a2), cy + bodyH + hw * Math.sin(a2)
-          ]);
-        }
-      } else {
-        // Pointed elongated hexagon
-        lines.push([cx, cy - hh, cx + hw, cy - hh + tipH]);
-        lines.push([cx + hw, cy - hh + tipH, cx + hw, cy + hh - tipH]);
-        lines.push([cx + hw, cy + hh - tipH, cx, cy + hh]);
-        lines.push([cx, cy + hh, cx - hw, cy + hh - tipH]);
-        lines.push([cx - hw, cy + hh - tipH, cx - hw, cy - hh + tipH]);
-        lines.push([cx - hw, cy - hh + tipH, cx, cy - hh]);
-      }
-    }
-  }
-
-  return { lines, circles, arcs };
-}
-
 function generateBrick(w, h, rng, density) {
   const lines = [];
   const brickW = Math.min(w, h) * (0.08 + (1 - density) * 0.1);
@@ -677,7 +616,6 @@ const SUBPATTERN_MAP = {
   triangle: generateTriangle,
   circles: generateCircles,
   basketweave: generateBasketweave,
-  picket: generatePicket,
   brick: generateBrick,
 };
 

@@ -41,7 +41,6 @@ These patterns are the workhorse of commercial and residential decorative metalw
 
    **a) Shared edges between adjacent cutouts**: When two cutout shapes share an edge (e.g., two rectangles side by side with no gap), the metal web between them has **zero width** — meaning there is no metal there at all. The two cutouts merge into one larger hole. This commonly happens with:
    - **Brick patterns** where adjacent bricks in the same row share a vertical edge
-   - **Picket/elongated hex patterns** where neighboring cells share side walls
    - **Any tessellation** where cutout shapes are defined independently per cell and the shared boundary gets drawn twice or collapses to zero width
 
    **The fix**: Cutout shapes are NOT the cells themselves. The **cell is the repeating unit of the grid** (including its share of the web). The **cutout is the cell MINUS the web width on all sides**. For every cutout, inset (shrink) the shape from the cell boundary by **half the web width** on every edge. This guarantees that adjacent cutouts always have a full web-width of solid metal between them.
@@ -51,9 +50,6 @@ These patterns are the workhorse of commercial and residential decorative metalw
    - Cutout = cell inset by 0.0625" (half web) on all sides = 2.875" × 1.375" rectangle
    - Two adjacent bricks in the same row: their cutouts are separated by 0.125" (0.0625" gap on each side of the shared cell boundary)
 
-   **Example — Picket/Elongated Hexagon pattern**:
-   - The hexagon cutout must be smaller than the hexagonal cell by half the web width on every edge
-   - Adjacent hexagons then have a full web of metal between them, not a shared wall
 
    **b) Coincident lines (double-cut)**: When the same line segment or arc is generated twice (e.g., once for cell A's right edge and once for cell B's left edge), the cutter traces that path twice. This causes:
    - Excessive heat buildup and material warping
@@ -135,13 +131,7 @@ When generating a Modern Minimalist pattern, randomly select ONE of the followin
 - **Parameters**: cell_size, rect_count (2 or 3 per cell), web_width
 - **Variation**: Rotated squares — instead of basket weave, squares are rotated 45° within each cell. **Bridges are mandatory**: 4 diagonal bridges connect each rotated square's corners to the parent cell's corners, preventing the rotated square island from falling out. This naturally creates an 8-pointed star negative space motif at each cell intersection.
 
-### 9. Elongated Hexagons (Picket / Fence Pattern)
-- **Description**: Vertically stretched hexagons creating a tall, slender cell pattern reminiscent of a picket fence.
-- **Construction**: Standard hexagonal grid but with the hexagons stretched vertically (or horizontally) by a configurable aspect ratio. **Critical: apply Principle 4 (no overlapping geometry)**. The hexagonal CELL defines the tessellation grid. The hexagonal CUTOUT is the cell inset by half the web width on all edges. This means the cutout hexagon is slightly smaller than the cell on every side, guaranteeing a full web of solid metal between neighboring pickets. Do NOT draw the cell boundaries as cut lines — only draw the inset cutout shapes.
-- **Parameters**: hex_width, hex_height, web_width, orientation (vertical | horizontal)
-- **Variation**: Rounded ends — the top and bottom vertices of each elongated hexagon are replaced with semicircular arcs, creating stadium/capsule shapes. The same inset rule applies — the capsule is inset from the cell boundary.
-
-### 10. Offset Brick Pattern
+### 9. Offset Brick Pattern
 - **Description**: Rectangular cutouts arranged in a running bond (brick-lay) pattern where each row is offset by half a cell width.
 - **Construction**: Standard rectangular grid but even rows are shifted horizontally by half the cell width. **Critical: apply Principle 4 (no overlapping geometry)**. Each brick CELL defines the grid position and size. The brick CUTOUT is the cell inset by half the web width on all four sides. This prevents adjacent bricks from sharing edges. In a running bond layout, the offset means vertical webs in alternating rows don't align — that's correct and expected; what matters is that every cutout rectangle is smaller than its cell by the web inset amount.
 - **Parameters**: brick_width, brick_height, web_width
@@ -189,7 +179,7 @@ function generateModernMinimalist(panel_width, panel_height, params):
 
 - **NO FLOATING ISLANDS (most common failure)**: Any closed cut loop causes everything inside it to physically fall out. If your pattern has a shape inside another shape (nested rectangles, concentric circles, center dots inside hexagons, etc.), the inner shape WILL BE LOST unless bridges connect it to the outer metal. Always add bridges or redesign to use open paths (arcs, partial shapes) instead of nested closed paths. **Test every design by asking: "If I trace each closed cut path, does anything inside it need to stay attached?"**
 - **Minimum web width**: Never generate webs thinner than the user-specified minimum (default 3mm / 0.125"). Check all gaps between adjacent cuts.
-- **NO OVERLAPPING OR COINCIDENT GEOMETRY**: See Core Principle 4. Every cutout must be inset from its cell boundary by half the web width. No cut line should be drawn twice, no two cut paths should touch or intersect. This is the most common cause of failed patterns in tessellations (brick, picket, honeycomb, etc.).
+- **NO OVERLAPPING OR COINCIDENT GEOMETRY**: See Core Principle 4. Every cutout must be inset from its cell boundary by half the web width. No cut line should be drawn twice, no two cut paths should touch or intersect. This is the most common cause of failed patterns in tessellations (brick, honeycomb, etc.).
 - **Minimum cutout size**: Cutouts smaller than ~2mm (0.08") may not cut cleanly. Enforce a minimum feature size.
 - **Corner relief**: Sharp interior corners (< 90°) should have a small relief radius to prevent stress cracking. Add a tiny arc (radius = material_thickness / 2) at sharp interior corners.
 - **Tab/bridge support for large cutouts**: For very large cutouts (where the waste piece is heavy enough to shift during cutting), add small tabs (bridges) to hold the waste piece in place until cutting is complete. Tabs are short uncut segments along a cut line, typically 1-3mm wide. These are cosmetic tabs meant to be snapped off after cutting — distinct from structural bridges that are permanent parts of the design.

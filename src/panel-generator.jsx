@@ -133,7 +133,7 @@ function generateDXF(pattern, frameData, w, h, unit) {
 
 const STYLES = [
   { id: "modern", name: "Modern Minimalist", icon: "▦", color: "#64748b",
-    subStyles: ["slats","rectangular","diamond","honeycomb","chevron","triangle","circles","basketweave","picket","brick"],
+    subStyles: ["slats","rectangular","diamond","honeycomb","chevron","triangle","circles","basketweave","brick"],
     generator: generateModernMinimalist },
 ];
 
