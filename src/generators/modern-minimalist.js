@@ -180,7 +180,8 @@ function generateDiamond(w, h, rng, scale, minBridgeGap) {
   const dh = variation === "elongated" ? cellSize * (1.5 + rng() * 0.3) : cellSize;
   const cols = Math.ceil(w / dw) + 2;
   const rows = Math.ceil(h / (dh * 0.5)) + 2;
-  const inset = cellSize * 0.08; // Constant inset
+  // Scale inset inversely with scale - smaller inset at high scale
+  const inset = cellSize * 0.08 * (1.1 - scale);
 
   for (let r = -1; r < rows; r++) {
     for (let c = -1; c < cols; c++) {
@@ -362,7 +363,8 @@ function generateTriangle(w, h, rng, scale, minBridgeGap) {
   const rowH = size * Math.sqrt(3) * 0.5;
   const cols = Math.ceil(w / size) + 2;
   const rows = Math.ceil(h / rowH) + 2;
-  const inset = size * 0.06; // Constant inset
+  // Scale inset inversely with scale - smaller inset at high scale
+  const inset = size * 0.06 * (1.1 - scale);
 
   for (let r = -1; r < rows; r++) {
     for (let c = -1; c < cols; c++) {

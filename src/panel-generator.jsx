@@ -212,20 +212,8 @@ export default function PanelGenerator() {
   const svgStrokeWidth = lineWidthMm * (viewW / panelWidthMm);
 
   const regenerate = () => {
-    const currentSignature = getVariationSignature(seed);
-    let newSeed;
-    let attempts = 0;
-    const maxAttempts = 100;
-
-    // Keep trying until we get a seed with a different variation signature
-    do {
-      newSeed = Math.floor(Math.random() * 100000);
-      attempts++;
-    } while (
-      getVariationSignature(newSeed) === currentSignature &&
-      attempts < maxAttempts
-    );
-
+    // Generate a new random seed
+    const newSeed = Math.floor(Math.random() * 100000);
     setSeed(newSeed);
   };
 
