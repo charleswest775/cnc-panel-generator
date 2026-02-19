@@ -167,7 +167,7 @@ export default function PanelGenerator() {
   const [panelHeight, setPanelHeight] = useState(36);
   const [unit, setUnit] = useState("inches");
   const [seed, setSeed] = useState(42);
-  const [density, setDensity] = useState(0.5);
+  const [scale, setScale] = useState(0.5);
   const [showFrame, setShowFrame] = useState(true);
   const [patternColor, setPatternColor] = useState("#ff0000");  // Red (cut lines)
   const [frameColor, setFrameColor] = useState("#000000");      // Black
@@ -194,10 +194,15 @@ export default function PanelGenerator() {
   }, []);
 
   const pattern = useMemo(() => {
-    if (!style) return { lines: [], circles: [], arcs: [] };
-    const raw = style.generator(viewW, viewH, seed, { subStyle, density });
+    if (!style) return { lines: [], circles: [], arcs: [], fills: [] };
+    // Calculate minimum bridge gap (1.5mm) in SVG units
+    const panelWidthMm = unit === "mm" ? panelWidth : panelWidth * 25.4;
+    const minBridgeGapMm = 1.5;
+    const minBridgeGap = minBridgeGapMm * (viewW / panelWidthMm);
+
+    const raw = style.generator(viewW, viewH, seed, { subStyle, scale, minBridgeGap });
     return clipLinesToPanel(raw, viewW, viewH, panelShape);
-  }, [selectedStyle, subStyle, panelShape, seed, density, viewW, viewH]);
+  }, [selectedStyle, subStyle, panelShape, seed, scale, viewW, viewH, panelWidth, unit]);
 
   const frameData = useMemo(() => getFrameLines(viewW, viewH, panelShape), [panelShape, viewW, viewH]);
   const framePath = useMemo(() => getFramePath(viewW, viewH, panelShape), [panelShape, viewW, viewH]);
@@ -353,9 +358,9 @@ export default function PanelGenerator() {
             </div>
 
             <div>
-              <label style={{ fontSize: 11, opacity: 0.6 }}>Pattern Density</label>
-              <input type="range" min="0.1" max="1" step="0.05" value={density}
-                onChange={e => setDensity(+e.target.value)}
+              <label style={{ fontSize: 11, opacity: 0.6 }}>Cutout Scale</label>
+              <input type="range" min="0.1" max="1" step="0.05" value={scale}
+                onChange={e => setScale(+e.target.value)}
                 style={{ width: "100%", marginTop: 4, accentColor: style?.color || "#8b5cf6" }} />
             </div>
 

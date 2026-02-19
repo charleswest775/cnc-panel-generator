@@ -483,6 +483,8 @@ const SUBPATTERN_MAP = {
 
 export function generateSacredGeometry(w, h, seed, params) {
   const rng = createRNG(seed);
+  const scale = params.scale || 0.5;
+  const minBridgeGap = params.minBridgeGap || 2;
   const subStyle = params.subStyle || "floweroflife";
   const density = params.density || 0.5;
   const layoutMode = params.layoutMode || "centered"; // "centered" or "tiled"

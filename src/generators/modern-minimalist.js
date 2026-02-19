@@ -11,52 +11,60 @@ function createRNG(seed) {
 
 // ─── Sub-pattern generators ──────────────────────────────────
 
-function generateSlats(w, h, rng, density) {
+function generateSlats(w, h, rng, scale, minBridgeGap) {
   const lines = [];
   const fills = [];
-  const cellSize = Math.min(w, h) * (0.03 + (1 - density) * 0.05);
-  const barWidth = cellSize * (0.5 + rng() * 0.2); // randomize bar width
-  const slotWidth = cellSize * (0.3 + rng() * 0.2); // randomize slot width
+  const cellSize = Math.min(w, h) * 0.06; // Constant grid spacing
+  const barWidth = cellSize * (0.5 + rng() * 0.2); // Constant bar width
+  const slotWidth = cellSize * (0.3 + rng() * 0.2); // Base slot width (will be scaled)
   const pitch = barWidth + slotWidth;
   const variation = rng() < 0.5 ? "staggered" : "tapered";
   const horizontal = rng() < 0.5;
 
   if (variation === "staggered") {
-    const segLen = Math.min(w, h) * (0.08 + (1 - density) * 0.12 + rng() * 0.04); // randomize segment length
-    const webGap = slotWidth * (0.05 + rng() * 0.06); // randomize gap
+    const segLen = Math.min(w, h) * (0.15 + rng() * 0.05); // Constant segment length
+    const webGap = slotWidth * (0.08 + rng() * 0.06); // Constant web gap
     if (horizontal) {
       const rows = Math.ceil(h / pitch) + 1;
       for (let r = 0; r < rows; r++) {
-        const y1 = r * pitch + barWidth; // start after the bar (in the slot region)
-        const y2 = y1 + slotWidth;       // slot height, not bar height
+        const y1 = r * pitch + barWidth;
+        const maxSlotH = slotWidth;
+        const scaledSlotH = maxSlotH * scale;
+        const yOffset = (maxSlotH - scaledSlotH) / 2;
+        const y1Scaled = y1 + yOffset;
+        const y2Scaled = y1Scaled + scaledSlotH;
         const offset = (r % 2) * segLen * 0.5;
         const cols = Math.ceil(w / segLen) + 2;
         for (let c = -1; c < cols; c++) {
           const x1 = c * segLen + offset + webGap;
           const x2 = x1 + segLen * 0.85 - webGap * 2;
           // Rectangle cutout (the slot between bar segments)
-          lines.push([x1, y1, x2, y1]);
-          lines.push([x2, y1, x2, y2]);
-          lines.push([x2, y2, x1, y2]);
-          lines.push([x1, y2, x1, y1]);
-          fills.push({ type: 'rect', x: x1, y: y1, width: x2 - x1, height: y2 - y1 });
+          lines.push([x1, y1Scaled, x2, y1Scaled]);
+          lines.push([x2, y1Scaled, x2, y2Scaled]);
+          lines.push([x2, y2Scaled, x1, y2Scaled]);
+          lines.push([x1, y2Scaled, x1, y1Scaled]);
+          fills.push({ type: 'rect', x: x1, y: y1Scaled, width: x2 - x1, height: y2Scaled - y1Scaled });
         }
       }
     } else {
       const cols = Math.ceil(w / pitch) + 1;
       for (let c = 0; c < cols; c++) {
-        const x1 = c * pitch + barWidth; // start after the bar (in the slot region)
-        const x2 = x1 + slotWidth;       // slot width, not bar width
+        const x1 = c * pitch + barWidth;
+        const maxSlotW = slotWidth;
+        const scaledSlotW = maxSlotW * scale;
+        const xOffset = (maxSlotW - scaledSlotW) / 2;
+        const x1Scaled = x1 + xOffset;
+        const x2Scaled = x1Scaled + scaledSlotW;
         const offset = (c % 2) * segLen * 0.5;
         const rows = Math.ceil(h / segLen) + 2;
         for (let r = -1; r < rows; r++) {
           const y1 = r * segLen + offset + webGap;
           const y2 = y1 + segLen * 0.85 - webGap * 2;
-          lines.push([x1, y1, x2, y1]);
-          lines.push([x2, y1, x2, y2]);
-          lines.push([x2, y2, x1, y2]);
-          lines.push([x1, y2, x1, y1]);
-          fills.push({ type: 'rect', x: x1, y: y1, width: x2 - x1, height: y2 - y1 });
+          lines.push([x1Scaled, y1, x2Scaled, y1]);
+          lines.push([x2Scaled, y1, x2Scaled, y2]);
+          lines.push([x2Scaled, y2, x1Scaled, y2]);
+          lines.push([x1Scaled, y2, x1Scaled, y1]);
+          fills.push({ type: 'rect', x: x1Scaled, y: y1, width: x2Scaled - x1Scaled, height: y2 - y1 });
         }
       }
     }
@@ -88,16 +96,16 @@ function generateSlats(w, h, rng, density) {
   return { lines, circles: [], arcs: [], fills };
 }
 
-function generateRectangular(w, h, rng, density) {
+function generateRectangular(w, h, rng, scale, minBridgeGap) {
   const lines = [];
   const fills = [];
-  const cellSize = Math.min(w, h) * (0.05 + (1 - density) * 0.07 + rng() * 0.02);
-  const webWidth = cellSize * (0.12 + rng() * 0.06);
+  const cellSize = Math.min(w, h) * (0.10 + rng() * 0.02); // Constant grid
+  const webWidth = cellSize * (0.12 + rng() * 0.06); // Constant web width
   const variation = rng() < 0.5 ? "nested" : "alternating";
 
   const cols = Math.ceil(w / cellSize) + 1;
   const rows = Math.ceil(h / cellSize) + 1;
-  const bridgeW = webWidth; // bridge width = web width
+  const bridgeW = Math.max(minBridgeGap, webWidth); // Ensure min bridge gap
 
   for (let r = 0; r < rows; r++) {
     for (let c = 0; c < cols; c++) {
@@ -107,50 +115,47 @@ function generateRectangular(w, h, rng, density) {
       const ch = cellSize - webWidth;
 
       if (variation === "nested") {
-        const mx = x + cw / 2, my = y + ch / 2;
+        // Scale both outer and inner rectangles
+        const maxCw = cw * scale;
+        const maxCh = ch * scale;
+        const offsetX = (cw - maxCw) / 2;
+        const offsetY = (ch - maxCh) / 2;
+        const sx = x + offsetX, sy = y + offsetY;
+        const mx = sx + maxCw / 2, my = sy + maxCh / 2;
         const bh = bridgeW / 2; // half bridge width
 
         // Outer rectangle with 4 bridge gaps (one per side midpoint)
-        // Top side: gap at midpoint
-        lines.push([x, y, mx - bh, y]);
-        lines.push([mx + bh, y, x + cw, y]);
-        // Right side: gap at midpoint
-        lines.push([x + cw, y, x + cw, my - bh]);
-        lines.push([x + cw, my + bh, x + cw, y + ch]);
-        // Bottom side: gap at midpoint
-        lines.push([x + cw, y + ch, mx + bh, y + ch]);
-        lines.push([mx - bh, y + ch, x, y + ch]);
-        // Left side: gap at midpoint
-        lines.push([x, y + ch, x, my + bh]);
-        lines.push([x, my - bh, x, y]);
+        lines.push([sx, sy, mx - bh, sy]);
+        lines.push([mx + bh, sy, sx + maxCw, sy]);
+        lines.push([sx + maxCw, sy, sx + maxCw, my - bh]);
+        lines.push([sx + maxCw, my + bh, sx + maxCw, sy + maxCh]);
+        lines.push([sx + maxCw, sy + maxCh, mx + bh, sy + maxCh]);
+        lines.push([mx - bh, sy + maxCh, sx, sy + maxCh]);
+        lines.push([sx, sy + maxCh, sx, my + bh]);
+        lines.push([sx, my - bh, sx, sy]);
 
-        // Inner nested rectangle with matching gaps - fill this inner rectangle
-        const inset = cw * 0.25;
-        const ix = x + inset, iy = y + inset;
-        const iw = cw - inset * 2, ih = ch - inset * 2;
+        // Inner nested rectangle - fill this one
+        const inset = maxCw * 0.25;
+        const ix = sx + inset, iy = sy + inset;
+        const iw = maxCw - inset * 2, ih = maxCh - inset * 2;
         if (iw > 0 && ih > 0) {
           const imx = ix + iw / 2, imy = iy + ih / 2;
-          // Top side
           lines.push([ix, iy, imx - bh, iy]);
           lines.push([imx + bh, iy, ix + iw, iy]);
-          // Right side
           lines.push([ix + iw, iy, ix + iw, imy - bh]);
           lines.push([ix + iw, imy + bh, ix + iw, iy + ih]);
-          // Bottom side
           lines.push([ix + iw, iy + ih, imx + bh, iy + ih]);
           lines.push([imx - bh, iy + ih, ix, iy + ih]);
-          // Left side
           lines.push([ix, iy + ih, ix, imy + bh]);
           lines.push([ix, imy - bh, ix, iy]);
-          // Fill inner rectangle
           fills.push({ type: 'rect', x: ix, y: iy, width: iw, height: ih });
         }
       } else {
-        // Alternating sizes — single closed cutouts, fill all rectangles
+        // Alternating sizes — scale rectangles
         const isSmall = (r + c) % 2 === 0;
-        const scale = isSmall ? 0.6 : 1.0;
-        const aw = cw * scale;
-        const ah = ch * scale;
+        const sizeVariation = isSmall ? 0.6 : 1.0;
+        const aw = cw * scale * sizeVariation;
+        const ah = ch * scale * sizeVariation;
         const ax = x + (cw - aw) / 2;
         const ay = y + (ch - ah) / 2;
         lines.push([ax, ay, ax + aw, ay]);
@@ -165,50 +170,42 @@ function generateRectangular(w, h, rng, density) {
   return { lines, circles: [], arcs: [], fills };
 }
 
-function generateDiamond(w, h, rng, density) {
+function generateDiamond(w, h, rng, scale, minBridgeGap) {
   const lines = [];
   const fills = [];
-  const cellSize = Math.min(w, h) * (0.06 + (1 - density) * 0.08 + rng() * 0.02);
+  const cellSize = Math.min(w, h) * (0.12 + rng() * 0.02); // Constant grid
   const variation = rng() < 0.5 ? "elongated" : "double";
 
   const dw = cellSize * (0.95 + rng() * 0.1);
   const dh = variation === "elongated" ? cellSize * (1.5 + rng() * 0.3) : cellSize;
   const cols = Math.ceil(w / dw) + 2;
   const rows = Math.ceil(h / (dh * 0.5)) + 2;
-  const inset = cellSize * 0.08;
+  const inset = cellSize * 0.08; // Constant inset
 
   for (let r = -1; r < rows; r++) {
     for (let c = -1; c < cols; c++) {
       const cx = c * dw + (r % 2 ? dw * 0.5 : 0);
       const cy = r * dh * 0.5;
-      const hw = dw * 0.5 - inset;
-      const hh = dh * 0.5 - inset;
+      const maxHw = (dw * 0.5 - inset) * scale;
+      const maxHh = (dh * 0.5 - inset) * scale;
 
       if (variation === "double") {
-        // Bridge gaps at the 4 cardinal vertices (top, right, bottom, left).
-        // Each diamond side is drawn stopping short of bridge vertices.
-        // The fraction 'g' controls how far from the vertex the gap extends along each side.
-        const g = 0.12;
+        // Scale both diamonds, ensure min bridge gap
+        const bridgeGapFrac = Math.max(0.10, minBridgeGap / (maxHw * 2));
         const s = 0.5; // inner diamond scale
 
-        // Outer diamond — 4 sides, each with gaps near bridge vertices
-        // Vertices: T=(cx, cy-hh), R=(cx+hw, cy), B=(cx, cy+hh), L=(cx-hw, cy)
-        // Side T→R: start g along from T, end g back from R
-        lines.push([cx + hw * g, cy - hh + hh * g, cx + hw * (1 - g), cy - hh * g]);
-        // Side R→B
-        lines.push([cx + hw * (1 - g), cy + hh * g, cx + hw * g, cy + hh * (1 - g)]);
-        // Side B→L
-        lines.push([cx - hw * g, cy + hh * (1 - g), cx - hw * (1 - g), cy + hh * g]);
-        // Side L→T
-        lines.push([cx - hw * (1 - g), cy - hh * g, cx - hw * g, cy - hh * (1 - g)]);
+        // Outer diamond with bridge gaps
+        lines.push([cx + maxHw * bridgeGapFrac, cy - maxHh + maxHh * bridgeGapFrac, cx + maxHw * (1 - bridgeGapFrac), cy - maxHh * bridgeGapFrac]);
+        lines.push([cx + maxHw * (1 - bridgeGapFrac), cy + maxHh * bridgeGapFrac, cx + maxHw * bridgeGapFrac, cy + maxHh * (1 - bridgeGapFrac)]);
+        lines.push([cx - maxHw * bridgeGapFrac, cy + maxHh * (1 - bridgeGapFrac), cx - maxHw * (1 - bridgeGapFrac), cy + maxHh * bridgeGapFrac]);
+        lines.push([cx - maxHw * (1 - bridgeGapFrac), cy - maxHh * bridgeGapFrac, cx - maxHw * bridgeGapFrac, cy - maxHh * (1 - bridgeGapFrac)]);
 
-        // Inner diamond — same gap pattern, fill this one
-        const ihw = hw * s, ihh = hh * s;
-        lines.push([cx + ihw * g, cy - ihh + ihh * g, cx + ihw * (1 - g), cy - ihh * g]);
-        lines.push([cx + ihw * (1 - g), cy + ihh * g, cx + ihw * g, cy + ihh * (1 - g)]);
-        lines.push([cx - ihw * g, cy + ihh * (1 - g), cx - ihw * (1 - g), cy + ihh * g]);
-        lines.push([cx - ihw * (1 - g), cy - ihh * g, cx - ihw * g, cy - ihh * (1 - g)]);
-        // Fill inner diamond
+        // Inner diamond with bridge gaps - fill this one
+        const ihw = maxHw * s, ihh = maxHh * s;
+        lines.push([cx + ihw * bridgeGapFrac, cy - ihh + ihh * bridgeGapFrac, cx + ihw * (1 - bridgeGapFrac), cy - ihh * bridgeGapFrac]);
+        lines.push([cx + ihw * (1 - bridgeGapFrac), cy + ihh * bridgeGapFrac, cx + ihw * bridgeGapFrac, cy + ihh * (1 - bridgeGapFrac)]);
+        lines.push([cx - ihw * bridgeGapFrac, cy + ihh * (1 - bridgeGapFrac), cx - ihw * (1 - bridgeGapFrac), cy + ihh * bridgeGapFrac]);
+        lines.push([cx - ihw * (1 - bridgeGapFrac), cy - ihh * bridgeGapFrac, cx - ihw * bridgeGapFrac, cy - ihh * (1 - bridgeGapFrac)]);
         fills.push({
           type: 'polygon',
           points: [
@@ -218,20 +215,19 @@ function generateDiamond(w, h, rng, density) {
             [cx - ihw, cy]
           ]
         });
-        // Uncut metal at the 4 cardinal points forms the bridges — no lines needed there.
       } else {
-        // Elongated — single diamond cutout, fill it
-        lines.push([cx, cy - hh, cx + hw, cy]);
-        lines.push([cx + hw, cy, cx, cy + hh]);
-        lines.push([cx, cy + hh, cx - hw, cy]);
-        lines.push([cx - hw, cy, cx, cy - hh]);
+        // Elongated — scale diamond
+        lines.push([cx, cy - maxHh, cx + maxHw, cy]);
+        lines.push([cx + maxHw, cy, cx, cy + maxHh]);
+        lines.push([cx, cy + maxHh, cx - maxHw, cy]);
+        lines.push([cx - maxHw, cy, cx, cy - maxHh]);
         fills.push({
           type: 'polygon',
           points: [
-            [cx, cy - hh],
-            [cx + hw, cy],
-            [cx, cy + hh],
-            [cx - hw, cy]
+            [cx, cy - maxHh],
+            [cx + maxHw, cy],
+            [cx, cy + maxHh],
+            [cx - maxHw, cy]
           ]
         });
       }
@@ -241,12 +237,12 @@ function generateDiamond(w, h, rng, density) {
   return { lines, circles: [], arcs: [], fills };
 }
 
-function generateHoneycomb(w, h, rng, density) {
+function generateHoneycomb(w, h, rng, scale, minBridgeGap) {
   const lines = [];
   const circles = [];
   const arcs = [];
   const fills = [];
-  const hexR = Math.min(w, h) * (0.03 + (1 - density) * 0.05 + rng() * 0.015);
+  const hexR = Math.min(w, h) * (0.06 + rng() * 0.015); // Constant grid
   const variation = rng() < 0.5 ? "partial" : "centerdot";
 
   const hexW = hexR * Math.sqrt(3);
@@ -261,52 +257,48 @@ function generateHoneycomb(w, h, rng, density) {
 
       if (variation === "partial" && (r + c) % 2 === 0) continue;
 
-      const webWidth = hexR * 0.15;
-      const inR = hexR - webWidth / 2;
+      const webWidth = hexR * 0.15; // Constant web width
+      const maxInR = (hexR - webWidth / 2) * scale;
 
       if (variation === "centerdot") {
-        // Hex with 3 bridge gaps at 120° spacing (sides 0, 2, 4) connecting
-        // a central solid disc to the surrounding web. The bridge is the uncut
-        // gap in the hex outline — radial spokes of metal.
-        const bridgeFrac = 0.25; // fraction of each side that is a gap
+        // Scale hex and center dot, ensure min bridge gap
+        const sideLength = maxInR * Math.sqrt(3);
+        const bridgeFrac = Math.max(0.20, minBridgeGap / sideLength);
+
         for (let i = 0; i < 6; i++) {
           const a1 = (Math.PI / 3) * i - Math.PI / 6;
           const a2 = (Math.PI / 3) * ((i + 1) % 6) - Math.PI / 6;
-          const x1 = cx + inR * Math.cos(a1), y1 = cy + inR * Math.sin(a1);
-          const x2 = cx + inR * Math.cos(a2), y2 = cy + inR * Math.sin(a2);
+          const x1 = cx + maxInR * Math.cos(a1), y1 = cy + maxInR * Math.sin(a1);
+          const x2 = cx + maxInR * Math.cos(a2), y2 = cy + maxInR * Math.sin(a2);
 
           if (i % 2 === 0) {
-            // Bridge side — gap in the middle, draw two short segments at ends
+            // Bridge side — gap in the middle
             const bf = bridgeFrac / 2;
             lines.push([x1, y1, x1 + (x2 - x1) * (0.5 - bf), y1 + (y2 - y1) * (0.5 - bf)]);
             lines.push([x1 + (x2 - x1) * (0.5 + bf), y1 + (y2 - y1) * (0.5 + bf), x2, y2]);
           } else {
-            // Full side — no bridge needed
             lines.push([x1, y1, x2, y2]);
           }
         }
 
-        // Center dot as 3 arcs (~100° each) instead of a full closed circle.
-        // Gaps align with the 3 bridge spoke directions.
-        const dotR = hexR * 0.2;
-        const arcSpan = Math.PI * 2 / 3 * 0.85; // each arc slightly less than 120°
+        // Center dot - scale with hex
+        const dotR = hexR * 0.2 * scale;
+        const arcSpan = Math.PI * 2 / 3 * 0.85;
         for (let b = 0; b < 3; b++) {
-          const bridgeAngle = (Math.PI / 3) * (b * 2) - Math.PI / 6 + Math.PI / 6; // midpoint angle of bridge sides
+          const bridgeAngle = (Math.PI / 3) * (b * 2) - Math.PI / 6 + Math.PI / 6;
           const arcStart = bridgeAngle + (Math.PI * 2 / 3 - arcSpan) / 2;
           const arcEnd = arcStart + arcSpan;
-          // Add as proper arc instead of line segments
           arcs.push([cx, cy, dotR, arcStart, arcEnd]);
         }
-        // Fill center dot
         fills.push({ type: 'circle', cx, cy, r: dotR });
       } else {
-        // Partial or standard — simple closed hex cutouts, no nesting issue
+        // Partial — scale hexagons
         for (let i = 0; i < 6; i++) {
           const a1 = (Math.PI / 3) * i - Math.PI / 6;
           const a2 = (Math.PI / 3) * ((i + 1) % 6) - Math.PI / 6;
           lines.push([
-            cx + inR * Math.cos(a1), cy + inR * Math.sin(a1),
-            cx + inR * Math.cos(a2), cy + inR * Math.sin(a2)
+            cx + maxInR * Math.cos(a1), cy + maxInR * Math.sin(a1),
+            cx + maxInR * Math.cos(a2), cy + maxInR * Math.sin(a2)
           ]);
         }
       }
@@ -316,9 +308,9 @@ function generateHoneycomb(w, h, rng, density) {
   return { lines, circles, arcs, fills };
 }
 
-function generateChevron(w, h, rng, density) {
+function generateChevron(w, h, rng, scale, minBridgeGap) {
   const lines = [];
-  const cellSize = Math.min(w, h) * (0.05 + (1 - density) * 0.07 + rng() * 0.02);
+  const cellSize = Math.min(w, h) * (0.10 + rng() * 0.02); // Constant grid
   const variation = rng() < 0.5 ? "nested" : "broken";
 
   const chevW = cellSize * (1.4 + rng() * 0.3);
@@ -335,25 +327,23 @@ function generateChevron(w, h, rng, density) {
 
       if (variation === "nested") {
         for (let n = 0; n < 3; n++) {
-          const scale = 1 - n * 0.28;
-          const sw = chevW * 0.5 * scale;
-          const sh = chevH * 0.5 * scale * dir;
+          const nestScale = 1 - n * 0.28;
+          const sw = chevW * 0.5 * nestScale * scale;
+          const sh = chevH * 0.5 * nestScale * scale * dir;
           const cx = x + chevW * 0.5;
           const cy = y;
           lines.push([cx - sw, cy, cx, cy + sh]);
           lines.push([cx, cy + sh, cx + sw, cy]);
         }
       } else {
-        // Broken/dashed chevron
+        // Broken/dashed chevron - scale the chevron
         const cx = x + chevW * 0.5;
         const gap = 0.15;
-        // Left arm — two segments with gap
-        const lx1 = x, ly1 = y;
-        const mx = cx, my = tipY;
+        const lx1 = x + chevW * 0.5 * (1 - scale), ly1 = y;
+        const rx1 = x + chevW - chevW * 0.5 * (1 - scale), ry1 = y;
+        const mx = cx, my = y + (tipY - y) * scale;
         lines.push([lx1, ly1, lx1 + (mx - lx1) * (0.5 - gap), ly1 + (my - ly1) * (0.5 - gap)]);
         lines.push([lx1 + (mx - lx1) * (0.5 + gap), ly1 + (my - ly1) * (0.5 + gap), mx, my]);
-        // Right arm
-        const rx1 = x + chevW, ry1 = y;
         lines.push([rx1, ry1, rx1 + (mx - rx1) * (0.5 - gap), ry1 + (my - ry1) * (0.5 - gap)]);
         lines.push([rx1 + (mx - rx1) * (0.5 + gap), ry1 + (my - ry1) * (0.5 + gap), mx, my]);
       }
@@ -363,16 +353,16 @@ function generateChevron(w, h, rng, density) {
   return { lines, circles: [], arcs: [], fills: [] };
 }
 
-function generateTriangle(w, h, rng, density) {
+function generateTriangle(w, h, rng, scale, minBridgeGap) {
   const lines = [];
   const fills = [];
-  const size = Math.min(w, h) * (0.05 + (1 - density) * 0.07);
+  const size = Math.min(w, h) * 0.10; // Constant grid
   const variation = rng() < 0.5 ? "alternate" : "subdivided";
 
   const rowH = size * Math.sqrt(3) * 0.5;
   const cols = Math.ceil(w / size) + 2;
   const rows = Math.ceil(h / rowH) + 2;
-  const inset = size * 0.06;
+  const inset = size * 0.06; // Constant inset
 
   for (let r = -1; r < rows; r++) {
     for (let c = -1; c < cols; c++) {
@@ -383,19 +373,22 @@ function generateTriangle(w, h, rng, density) {
       if (variation === "alternate" && (r + c) % 2 === 0) continue;
 
       if (up) {
-        const x0 = x + size * 0.5, y0 = y + inset;
-        const x1 = x + inset,       y1 = y + rowH - inset;
-        const x2 = x + size - inset, y2 = y + rowH - inset;
+        const cx = x + size * 0.5, cy = y + rowH * 0.67;
+        const baseX0 = x + size * 0.5, baseY0 = y + inset;
+        const baseX1 = x + inset, baseY1 = y + rowH - inset;
+        const baseX2 = x + size - inset, baseY2 = y + rowH - inset;
+        // Scale from centroid
+        const x0 = cx + (baseX0 - cx) * scale, y0 = cy + (baseY0 - cy) * scale;
+        const x1 = cx + (baseX1 - cx) * scale, y1 = cy + (baseY1 - cy) * scale;
+        const x2 = cx + (baseX2 - cx) * scale, y2 = cy + (baseY2 - cy) * scale;
 
         if (variation === "subdivided") {
-          // Subdivide into 4, cut center only
           const mx01 = (x0 + x1) / 2, my01 = (y0 + y1) / 2;
           const mx12 = (x1 + x2) / 2, my12 = (y1 + y2) / 2;
           const mx02 = (x0 + x2) / 2, my02 = (y0 + y2) / 2;
           lines.push([mx01, my01, mx02, my02]);
           lines.push([mx02, my02, mx12, my12]);
           lines.push([mx12, my12, mx01, my01]);
-          // Fill center triangle
           fills.push({
             type: 'polygon',
             points: [[mx01, my01], [mx02, my02], [mx12, my12]]
@@ -404,16 +397,20 @@ function generateTriangle(w, h, rng, density) {
           lines.push([x0, y0, x2, y2]);
           lines.push([x2, y2, x1, y1]);
           lines.push([x1, y1, x0, y0]);
-          // Fill triangle
           fills.push({
             type: 'polygon',
             points: [[x0, y0], [x2, y2], [x1, y1]]
           });
         }
       } else {
-        const x0 = x + size * 0.5, y0 = y + rowH - inset;
-        const x1 = x + inset,       y1 = y + inset;
-        const x2 = x + size - inset, y2 = y + inset;
+        const cx = x + size * 0.5, cy = y + rowH * 0.33;
+        const baseX0 = x + size * 0.5, baseY0 = y + rowH - inset;
+        const baseX1 = x + inset, baseY1 = y + inset;
+        const baseX2 = x + size - inset, baseY2 = y + inset;
+        // Scale from centroid
+        const x0 = cx + (baseX0 - cx) * scale, y0 = cy + (baseY0 - cy) * scale;
+        const x1 = cx + (baseX1 - cx) * scale, y1 = cy + (baseY1 - cy) * scale;
+        const x2 = cx + (baseX2 - cx) * scale, y2 = cy + (baseY2 - cy) * scale;
 
         if (variation === "subdivided") {
           const mx01 = (x0 + x1) / 2, my01 = (y0 + y1) / 2;
@@ -422,7 +419,6 @@ function generateTriangle(w, h, rng, density) {
           lines.push([mx01, my01, mx02, my02]);
           lines.push([mx02, my02, mx12, my12]);
           lines.push([mx12, my12, mx01, my01]);
-          // Fill center triangle
           fills.push({
             type: 'polygon',
             points: [[mx01, my01], [mx02, my02], [mx12, my12]]
@@ -431,7 +427,6 @@ function generateTriangle(w, h, rng, density) {
           lines.push([x0, y0, x2, y2]);
           lines.push([x2, y2, x1, y1]);
           lines.push([x1, y1, x0, y0]);
-          // Fill triangle
           fills.push({
             type: 'polygon',
             points: [[x0, y0], [x2, y2], [x1, y1]]
@@ -444,12 +439,12 @@ function generateTriangle(w, h, rng, density) {
   return { lines, circles: [], arcs: [], fills };
 }
 
-function generateCircles(w, h, rng, density) {
+function generateCircles(w, h, rng, scale, minBridgeGap) {
   const lines = [];
   const circles = [];
   const arcs = [];
   const fills = [];
-  const cellSize = Math.min(w, h) * (0.04 + (1 - density) * 0.06 + rng() * 0.015);
+  const cellSize = Math.min(w, h) * (0.08 + rng() * 0.02); // Constant grid
   const variation = rng() < 0.5 ? "concentric" : "mixed";
   const hexPacked = rng() < 0.5;
   const sizeVariation = 0.8 + rng() * 0.4; // random size multiplier
@@ -457,7 +452,7 @@ function generateCircles(w, h, rng, density) {
   const cols = Math.ceil(w / cellSize) + 2;
   const rows = Math.ceil(h / (hexPacked ? cellSize * 0.866 : cellSize)) + 2;
   const numSpokes = 4; // radial bridges per ring
-  const spokeGap = 0.12; // radians of gap per spoke (half on each side)
+  const webWidth = cellSize * 0.12; // Constant web width
 
   for (let r = -1; r < rows; r++) {
     for (let c = -1; c < cols; c++) {
@@ -465,12 +460,15 @@ function generateCircles(w, h, rng, density) {
       const cy = r * (hexPacked ? cellSize * 0.866 : cellSize);
 
       if (variation === "concentric") {
-        // Concentric rings drawn as arcs with gaps at spoke positions.
-        // Spokes are uncut radial strips connecting each ring outward.
-        const webWidth = cellSize * 0.12;
-        const outerR = (cellSize / 2 - webWidth / 2) * sizeVariation;
-        const radii = [outerR, outerR * 0.6];
-        if (rng() > 0.5) radii.push(outerR * 0.3);
+        // Concentric rings with radial bridges - scale rings, enforce min bridge gap
+        const maxRadius = (cellSize / 2 - webWidth / 2) * sizeVariation;
+        const scaledMaxRadius = maxRadius * scale;
+        const radii = [scaledMaxRadius, scaledMaxRadius * 0.6];
+        if (rng() > 0.5) radii.push(scaledMaxRadius * 0.3);
+
+        // Calculate spoke gap in radians to ensure minimum physical gap
+        const avgRadius = scaledMaxRadius * 0.7;
+        const minGapRadians = Math.max(0.08, minBridgeGap / avgRadius);
 
         for (let ri = 0; ri < radii.length; ri++) {
           const ringR = radii[ri];
@@ -478,19 +476,18 @@ function generateCircles(w, h, rng, density) {
           for (let sp = 0; sp < numSpokes; sp++) {
             const spokeAngle = (Math.PI * 2 * sp) / numSpokes;
             const nextSpokeAngle = (Math.PI * 2 * (sp + 1)) / numSpokes;
-            const arcStart = spokeAngle + spokeGap;
-            const arcEnd = nextSpokeAngle - spokeGap;
-            // Add as proper arc instead of line segments
+            const arcStart = spokeAngle + minGapRadians;
+            const arcEnd = nextSpokeAngle - minGapRadians;
             arcs.push([cx, cy, ringR, arcStart, arcEnd]);
           }
         }
         // No fills for concentric (bridged rings)
       } else {
-        // Mixed sizes — single circle cutouts, fill all circles
-        const webWidth = cellSize * 0.12;
+        // Mixed sizes — scale circles
         const maxRadius = (cellSize / 2 - webWidth / 2) * sizeVariation;
+        const scaledMaxRadius = maxRadius * scale;
         const isLarge = (r + c) % 2 === 0;
-        const radius = isLarge ? maxRadius : maxRadius * 0.6;
+        const radius = isLarge ? scaledMaxRadius : scaledMaxRadius * 0.6;
         circles.push([cx, cy, radius]);
         fills.push({ type: 'circle', cx, cy, r: radius });
       }
@@ -500,12 +497,12 @@ function generateCircles(w, h, rng, density) {
   return { lines, circles, arcs, fills };
 }
 
-function generateBasketweave(w, h, rng, density) {
+function generateBasketweave(w, h, rng, scale, minBridgeGap) {
   const lines = [];
   const fills = [];
-  const cellSize = Math.min(w, h) * (0.06 + (1 - density) * 0.08 + rng() * 0.02);
+  const cellSize = Math.min(w, h) * (0.12 + rng() * 0.02); // Constant grid
   const variation = rng() < 0.5 ? "weave" : "rotated";
-  const webWidth = cellSize * (0.08 + rng() * 0.04);
+  const webWidth = cellSize * (0.12 + rng() * 0.04); // Constant web width
 
   const cols = Math.ceil(w / cellSize) + 1;
   const rows = Math.ceil(h / cellSize) + 1;
@@ -519,58 +516,58 @@ function generateBasketweave(w, h, rng, density) {
       if (variation === "weave") {
         const rectCount = 2;
         if (isHorizontal) {
-          const rh = (cellSize - webWidth * (rectCount + 1)) / rectCount;
+          const maxRh = (cellSize - webWidth * (rectCount + 1)) / rectCount;
+          const scaledRh = maxRh * scale;
           for (let i = 0; i < rectCount; i++) {
-            const ry = y + webWidth + i * (rh + webWidth);
+            const baseRy = y + webWidth + i * (maxRh + webWidth);
+            const ryOffset = (maxRh - scaledRh) / 2;
+            const ry = baseRy + ryOffset;
             const rx = x + webWidth;
-            const rw = cellSize - webWidth * 2;
-            lines.push([rx, ry, rx + rw, ry]);
-            lines.push([rx + rw, ry, rx + rw, ry + rh]);
-            lines.push([rx + rw, ry + rh, rx, ry + rh]);
-            lines.push([rx, ry + rh, rx, ry]);
-            fills.push({ type: 'rect', x: rx, y: ry, width: rw, height: rh });
+            const maxRw = cellSize - webWidth * 2;
+            const scaledRw = maxRw * scale;
+            const rxOffset = (maxRw - scaledRw) / 2;
+            lines.push([rx + rxOffset, ry, rx + rxOffset + scaledRw, ry]);
+            lines.push([rx + rxOffset + scaledRw, ry, rx + rxOffset + scaledRw, ry + scaledRh]);
+            lines.push([rx + rxOffset + scaledRw, ry + scaledRh, rx + rxOffset, ry + scaledRh]);
+            lines.push([rx + rxOffset, ry + scaledRh, rx + rxOffset, ry]);
+            fills.push({ type: 'rect', x: rx + rxOffset, y: ry, width: scaledRw, height: scaledRh });
           }
         } else {
-          const rw2 = (cellSize - webWidth * (rectCount + 1)) / rectCount;
+          const maxRw2 = (cellSize - webWidth * (rectCount + 1)) / rectCount;
+          const scaledRw2 = maxRw2 * scale;
           for (let i = 0; i < rectCount; i++) {
-            const rx = x + webWidth + i * (rw2 + webWidth);
+            const baseRx = x + webWidth + i * (maxRw2 + webWidth);
+            const rxOffset = (maxRw2 - scaledRw2) / 2;
+            const rx = baseRx + rxOffset;
             const ry = y + webWidth;
-            const rh2 = cellSize - webWidth * 2;
-            lines.push([rx, ry, rx + rw2, ry]);
-            lines.push([rx + rw2, ry, rx + rw2, ry + rh2]);
-            lines.push([rx + rw2, ry + rh2, rx, ry + rh2]);
-            lines.push([rx, ry + rh2, rx, ry]);
-            fills.push({ type: 'rect', x: rx, y: ry, width: rw2, height: rh2 });
+            const maxRh2 = cellSize - webWidth * 2;
+            const scaledRh2 = maxRh2 * scale;
+            const ryOffset = (maxRh2 - scaledRh2) / 2;
+            lines.push([rx, ry + ryOffset, rx + scaledRw2, ry + ryOffset]);
+            lines.push([rx + scaledRw2, ry + ryOffset, rx + scaledRw2, ry + ryOffset + scaledRh2]);
+            lines.push([rx + scaledRw2, ry + ryOffset + scaledRh2, rx, ry + ryOffset + scaledRh2]);
+            lines.push([rx, ry + ryOffset + scaledRh2, rx, ry + ryOffset]);
+            fills.push({ type: 'rect', x: rx, y: ry + ryOffset, width: scaledRw2, height: scaledRh2 });
           }
         }
       } else {
-        // Rotated squares — diamond cutout with 4 bridge gaps at cardinal
-        // points (top, right, bottom, left vertices). Uncut metal at each
-        // vertex connects the rotated square island to the cell corners,
-        // creating an 8-pointed star negative space motif.
+        // Rotated squares — scale diamond, ensure min bridge gap
         const ccx = x + cellSize / 2;
         const ccy = y + cellSize / 2;
-        const half = cellSize * 0.35;
-        const g = 0.15; // gap fraction near each vertex
+        const maxHalf = cellSize * 0.35 * scale;
+        const bridgeGapFrac = Math.max(0.12, minBridgeGap / (maxHalf * 2));
 
-        // Vertices: T=(ccx, ccy-half), R=(ccx+half, ccy), B=(ccx, ccy+half), L=(ccx-half, ccy)
-        // Each side drawn stopping short of both vertices by g fraction
-        // Side T→R
-        lines.push([ccx + half * g, ccy - half * (1 - g), ccx + half * (1 - g), ccy - half * g]);
-        // Side R→B
-        lines.push([ccx + half * (1 - g), ccy + half * g, ccx + half * g, ccy + half * (1 - g)]);
-        // Side B→L
-        lines.push([ccx - half * g, ccy + half * (1 - g), ccx - half * (1 - g), ccy + half * g]);
-        // Side L→T
-        lines.push([ccx - half * (1 - g), ccy - half * g, ccx - half * g, ccy - half * (1 - g)]);
-        // Fill rotated square (diamond)
+        lines.push([ccx + maxHalf * bridgeGapFrac, ccy - maxHalf * (1 - bridgeGapFrac), ccx + maxHalf * (1 - bridgeGapFrac), ccy - maxHalf * bridgeGapFrac]);
+        lines.push([ccx + maxHalf * (1 - bridgeGapFrac), ccy + maxHalf * bridgeGapFrac, ccx + maxHalf * bridgeGapFrac, ccy + maxHalf * (1 - bridgeGapFrac)]);
+        lines.push([ccx - maxHalf * bridgeGapFrac, ccy + maxHalf * (1 - bridgeGapFrac), ccx - maxHalf * (1 - bridgeGapFrac), ccy + maxHalf * bridgeGapFrac]);
+        lines.push([ccx - maxHalf * (1 - bridgeGapFrac), ccy - maxHalf * bridgeGapFrac, ccx - maxHalf * bridgeGapFrac, ccy - maxHalf * (1 - bridgeGapFrac)]);
         fills.push({
           type: 'polygon',
           points: [
-            [ccx, ccy - half],
-            [ccx + half, ccy],
-            [ccx, ccy + half],
-            [ccx - half, ccy]
+            [ccx, ccy - maxHalf],
+            [ccx + maxHalf, ccy],
+            [ccx, ccy + maxHalf],
+            [ccx - maxHalf, ccy]
           ]
         });
       }
@@ -580,12 +577,12 @@ function generateBasketweave(w, h, rng, density) {
   return { lines, circles: [], arcs: [], fills };
 }
 
-function generateBrick(w, h, rng, density) {
+function generateBrick(w, h, rng, scale, minBridgeGap) {
   const lines = [];
   const fills = [];
-  const brickW = Math.min(w, h) * (0.08 + (1 - density) * 0.1 + rng() * 0.025);
+  const brickW = Math.min(w, h) * (0.15 + rng() * 0.03); // Constant grid
   const brickH = brickW * (0.4 + rng() * 0.1);
-  const webWidth = brickW * (0.08 + rng() * 0.04);
+  const webWidth = brickW * (0.12 + rng() * 0.04); // Constant web width
   const variation = rng() < 0.5 ? "standard" : "soldier";
   const soldierInterval = 4 + Math.floor(rng() * 3);
 
@@ -604,25 +601,35 @@ function generateBrick(w, h, rng, density) {
       for (let c = -1; c < sCols; c++) {
         const x = c * sBrickW + webWidth / 2;
         const y = r * brickH + webWidth / 2;
-        const bw = sBrickW - webWidth;
-        const bh = sBrickH - webWidth;
-        lines.push([x, y, x + bw, y]);
-        lines.push([x + bw, y, x + bw, y + bh]);
-        lines.push([x + bw, y + bh, x, y + bh]);
-        lines.push([x, y + bh, x, y]);
-        fills.push({ type: 'rect', x, y, width: bw, height: bh });
+        const maxBw = sBrickW - webWidth;
+        const maxBh = sBrickH - webWidth;
+        // Scale brick dimensions
+        const bw = maxBw * scale;
+        const bh = maxBh * scale;
+        const offsetX = (maxBw - bw) / 2;
+        const offsetY = (maxBh - bh) / 2;
+        lines.push([x + offsetX, y + offsetY, x + offsetX + bw, y + offsetY]);
+        lines.push([x + offsetX + bw, y + offsetY, x + offsetX + bw, y + offsetY + bh]);
+        lines.push([x + offsetX + bw, y + offsetY + bh, x + offsetX, y + offsetY + bh]);
+        lines.push([x + offsetX, y + offsetY + bh, x + offsetX, y + offsetY]);
+        fills.push({ type: 'rect', x: x + offsetX, y: y + offsetY, width: bw, height: bh });
       }
     } else {
       for (let c = -1; c < cols; c++) {
         const x = c * brickW + offset + webWidth / 2;
         const y = r * brickH + webWidth / 2;
-        const bw = brickW - webWidth;
-        const bh = brickH - webWidth;
-        lines.push([x, y, x + bw, y]);
-        lines.push([x + bw, y, x + bw, y + bh]);
-        lines.push([x + bw, y + bh, x, y + bh]);
-        lines.push([x, y + bh, x, y]);
-        fills.push({ type: 'rect', x, y, width: bw, height: bh });
+        const maxBw = brickW - webWidth;
+        const maxBh = brickH - webWidth;
+        // Scale brick dimensions
+        const bw = maxBw * scale;
+        const bh = maxBh * scale;
+        const offsetX = (maxBw - bw) / 2;
+        const offsetY = (maxBh - bh) / 2;
+        lines.push([x + offsetX, y + offsetY, x + offsetX + bw, y + offsetY]);
+        lines.push([x + offsetX + bw, y + offsetY, x + offsetX + bw, y + offsetY + bh]);
+        lines.push([x + offsetX + bw, y + offsetY + bh, x + offsetX, y + offsetY + bh]);
+        lines.push([x + offsetX, y + offsetY + bh, x + offsetX, y + offsetY]);
+        fills.push({ type: 'rect', x: x + offsetX, y: y + offsetY, width: bw, height: bh });
       }
     }
   }
@@ -681,12 +688,13 @@ const SUBPATTERN_MAP = {
 export function generateModernMinimalist(w, h, seed, params) {
   const rng = createRNG(seed);
   const subStyle = params.subStyle || "slats";
-  const density = params.density || 0.5;
+  const scale = params.scale || 0.5;
+  const minBridgeGap = params.minBridgeGap || 2;
 
   const gen = SUBPATTERN_MAP[subStyle];
-  if (!gen) return { lines: [], circles: [], arcs: [] };
+  if (!gen) return { lines: [], circles: [], arcs: [], fills: [] };
 
-  const result = gen(w, h, rng, density);
+  const result = gen(w, h, rng, scale, minBridgeGap);
 
   // Margin clip — filter out geometry fully outside the panel margin
   const margin = Math.min(w, h) * 0.03;
