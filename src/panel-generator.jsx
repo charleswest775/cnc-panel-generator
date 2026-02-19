@@ -1,5 +1,6 @@
 import { useState, useCallback, useMemo, useRef } from "react";
 import { generateModernMinimalist } from "./generators/modern-minimalist.js";
+import { generateSacredGeometry } from "./generators/sacred-geometry.js";
 
 // ─── Clipping ─────────────────────────────────────────────────
 
@@ -67,34 +68,30 @@ function getFramePath(w, h, shape) {
 function getFrameLines(w, h, shape) {
   const lines = [];
   const circles = [];
+  const arcs = [];
+
   if (shape === "rectangle") {
     lines.push([0, 0, w, 0], [w, 0, w, h], [w, h, 0, h], [0, h, 0, 0]);
   } else if (shape === "circle") {
     const r = Math.min(w, h) / 2;
     circles.push([w / 2, h / 2, r]);
   } else if (shape === "oval") {
-    // Approximate with segments
+    // Use proper arcs for oval (4 quarter ellipses)
     const cx = w / 2, cy = h / 2, rx = w / 2, ry = h / 2;
-    const segs = 64;
-    for (let i = 0; i < segs; i++) {
-      const a1 = (Math.PI * 2 * i) / segs;
-      const a2 = (Math.PI * 2 * (i + 1)) / segs;
-      lines.push([cx + rx * Math.cos(a1), cy + ry * Math.sin(a1), cx + rx * Math.cos(a2), cy + ry * Math.sin(a2)]);
-    }
+    // For now, approximate ellipse with circle arcs (true ellipse would need separate handling)
+    // Using average radius - this is a simplification but better than line segments
+    const r = (rx + ry) / 2;
+    arcs.push([cx, cy, r, 0, Math.PI * 2]);
   } else if (shape === "arch") {
     const archH = h * 0.6;
     lines.push([0, h, 0, archH]);
     lines.push([w, archH, w, h]);
     lines.push([w, h, 0, h]);
-    const cx = w / 2, rx = w / 2, ry = archH;
-    const segs = 32;
-    for (let i = 0; i < segs; i++) {
-      const a1 = Math.PI + (Math.PI * i) / segs;
-      const a2 = Math.PI + (Math.PI * (i + 1)) / segs;
-      lines.push([cx + rx * Math.cos(a1), archH + ry * Math.sin(a1), cx + rx * Math.cos(a2), archH + ry * Math.sin(a2)]);
-    }
+    // Use proper arc for arch curve
+    const cx = w / 2, r = w / 2;
+    arcs.push([cx, archH, r, Math.PI, Math.PI * 2]);
   }
-  return { lines, circles };
+  return { lines, circles, arcs };
 }
 
 // ─── DXF Export ───────────────────────────────────────────────
@@ -117,13 +114,26 @@ function generateDXF(pattern, frameData, w, h, unit) {
     dxf += `0\nCIRCLE\n8\n${layer}\n10\n${(cx * scale).toFixed(4)}\n20\n${(cy * scale).toFixed(4)}\n30\n0.0\n40\n${(r * scale).toFixed(4)}\n`;
   };
 
+  const addArc = (cx, cy, r, startAngle, endAngle, layer) => {
+    // Convert radians to degrees for DXF
+    const startDeg = (startAngle * 180 / Math.PI) % 360;
+    const endDeg = (endAngle * 180 / Math.PI) % 360;
+    dxf += `0\nARC\n8\n${layer}\n10\n${(cx * scale).toFixed(4)}\n20\n${(cy * scale).toFixed(4)}\n30\n0.0\n40\n${(r * scale).toFixed(4)}\n50\n${startDeg.toFixed(4)}\n51\n${endDeg.toFixed(4)}\n`;
+  };
+
   // Frame
   frameData.lines.forEach(([x1, y1, x2, y2]) => addLine(x1, y1, x2, y2, "FRAME"));
   frameData.circles.forEach(([cx, cy, r]) => addCircle(cx, cy, r, "FRAME"));
+  if (frameData.arcs) {
+    frameData.arcs.forEach(([cx, cy, r, startAngle, endAngle]) => addArc(cx, cy, r, startAngle, endAngle, "FRAME"));
+  }
 
   // Pattern
   pattern.lines.forEach(([x1, y1, x2, y2]) => addLine(x1, y1, x2, y2, "PATTERN"));
   pattern.circles.forEach(([cx, cy, r]) => addCircle(cx, cy, r, "PATTERN"));
+  if (pattern.arcs) {
+    pattern.arcs.forEach(([cx, cy, r, startAngle, endAngle]) => addArc(cx, cy, r, startAngle, endAngle, "PATTERN"));
+  }
 
   dxf += `0\nENDSEC\n0\nEOF\n`;
   return dxf;
@@ -135,6 +145,9 @@ const STYLES = [
   { id: "modern", name: "Modern Minimalist", icon: "▦", color: "#64748b",
     subStyles: ["slats","rectangular","diamond","honeycomb","chevron","triangle","circles","basketweave","brick"],
     generator: generateModernMinimalist },
+  { id: "sacred", name: "Sacred Geometry", icon: "✦", color: "#8b5cf6",
+    subStyles: ["floweroflife","metatron","sriyantra","mandala","fibonacci","torus"],
+    generator: generateSacredGeometry },
 ];
 
 const SHAPES = [
@@ -165,6 +178,17 @@ export default function PanelGenerator() {
   const aspect = panelHeight / panelWidth;
   const viewH = viewW * aspect;
 
+  // Helper to get pattern variation signature from a seed
+  const getVariationSignature = useCallback((testSeed) => {
+    let s = Math.abs(testSeed | 0) || 1;
+    const rng = () => {
+      s = (s * 1664525 + 1013904223) & 0x7fffffff;
+      return s / 0x7fffffff;
+    };
+    // Get first 5 RNG calls which determine pattern variation
+    return [rng(), rng(), rng(), rng(), rng()].map(v => (v < 0.5 ? 0 : 1)).join('');
+  }, []);
+
   const pattern = useMemo(() => {
     if (!style) return { lines: [], circles: [], arcs: [] };
     const raw = style.generator(viewW, viewH, seed, { subStyle, density });
@@ -174,7 +198,23 @@ export default function PanelGenerator() {
   const frameData = useMemo(() => getFrameLines(viewW, viewH, panelShape), [panelShape, viewW, viewH]);
   const framePath = useMemo(() => getFramePath(viewW, viewH, panelShape), [panelShape, viewW, viewH]);
 
-  const regenerate = () => setSeed(Math.floor(Math.random() * 100000));
+  const regenerate = () => {
+    const currentSignature = getVariationSignature(seed);
+    let newSeed;
+    let attempts = 0;
+    const maxAttempts = 100;
+
+    // Keep trying until we get a seed with a different variation signature
+    do {
+      newSeed = Math.floor(Math.random() * 100000);
+      attempts++;
+    } while (
+      getVariationSignature(newSeed) === currentSignature &&
+      attempts < maxAttempts
+    );
+
+    setSeed(newSeed);
+  };
 
   const exportDXF = () => {
     const scaleX = panelWidth / viewW;
@@ -377,15 +417,29 @@ export default function PanelGenerator() {
               </defs>
 
               {/* Pattern */}
-              <g clipPath="url(#panelClip)">
+              <g clipPath="url(#panelClip)" opacity={0.8}>
                 {pattern.lines.map(([x1, y1, x2, y2], i) => (
                   <line key={`l${i}`} x1={x1} y1={y1} x2={x2} y2={y2}
-                    stroke={patternColor} strokeWidth={1} opacity={0.8} />
+                    stroke={patternColor} strokeWidth={1} />
                 ))}
                 {pattern.circles.map(([cx, cy, r], i) => (
                   <circle key={`c${i}`} cx={cx} cy={cy} r={r}
-                    stroke={patternColor} strokeWidth={1} fill="none" opacity={0.8} />
+                    stroke={patternColor} strokeWidth={1} fill="none" />
                 ))}
+                {pattern.arcs && pattern.arcs.map(([cx, cy, r, startAngle, endAngle], i) => {
+                  const x1 = cx + r * Math.cos(startAngle);
+                  const y1 = cy + r * Math.sin(startAngle);
+                  const x2 = cx + r * Math.cos(endAngle);
+                  const y2 = cy + r * Math.sin(endAngle);
+                  let angleDiff = endAngle - startAngle;
+                  if (angleDiff < 0) angleDiff += Math.PI * 2;
+                  const largeArcFlag = angleDiff > Math.PI ? 1 : 0;
+                  const d = `M ${x1} ${y1} A ${r} ${r} 0 ${largeArcFlag} 1 ${x2} ${y2}`;
+                  return (
+                    <path key={`a${i}`} d={d}
+                      stroke={patternColor} strokeWidth={1} fill="none" />
+                  );
+                })}
               </g>
 
               {/* Frame */}

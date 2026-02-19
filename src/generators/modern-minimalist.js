@@ -14,15 +14,15 @@ function createRNG(seed) {
 function generateSlats(w, h, rng, density) {
   const lines = [];
   const cellSize = Math.min(w, h) * (0.03 + (1 - density) * 0.05);
-  const barWidth = cellSize * 0.6;
-  const slotWidth = cellSize * 0.4;
+  const barWidth = cellSize * (0.5 + rng() * 0.2); // randomize bar width
+  const slotWidth = cellSize * (0.3 + rng() * 0.2); // randomize slot width
   const pitch = barWidth + slotWidth;
   const variation = rng() < 0.5 ? "staggered" : "tapered";
   const horizontal = rng() < 0.5;
 
   if (variation === "staggered") {
-    const segLen = Math.min(w, h) * (0.08 + (1 - density) * 0.12);
-    const webGap = slotWidth * 0.08; // small inset so adjacent segments don't share edges
+    const segLen = Math.min(w, h) * (0.08 + (1 - density) * 0.12 + rng() * 0.04); // randomize segment length
+    const webGap = slotWidth * (0.05 + rng() * 0.06); // randomize gap
     if (horizontal) {
       const rows = Math.ceil(h / pitch) + 1;
       for (let r = 0; r < rows; r++) {
@@ -87,8 +87,8 @@ function generateSlats(w, h, rng, density) {
 
 function generateRectangular(w, h, rng, density) {
   const lines = [];
-  const cellSize = Math.min(w, h) * (0.05 + (1 - density) * 0.07);
-  const webWidth = cellSize * 0.15;
+  const cellSize = Math.min(w, h) * (0.05 + (1 - density) * 0.07 + rng() * 0.02);
+  const webWidth = cellSize * (0.12 + rng() * 0.06);
   const variation = rng() < 0.5 ? "nested" : "alternating";
 
   const cols = Math.ceil(w / cellSize) + 1;
@@ -160,11 +160,11 @@ function generateRectangular(w, h, rng, density) {
 
 function generateDiamond(w, h, rng, density) {
   const lines = [];
-  const cellSize = Math.min(w, h) * (0.06 + (1 - density) * 0.08);
+  const cellSize = Math.min(w, h) * (0.06 + (1 - density) * 0.08 + rng() * 0.02);
   const variation = rng() < 0.5 ? "elongated" : "double";
 
-  const dw = cellSize;
-  const dh = variation === "elongated" ? cellSize * 1.6 : cellSize;
+  const dw = cellSize * (0.95 + rng() * 0.1);
+  const dh = variation === "elongated" ? cellSize * (1.5 + rng() * 0.3) : cellSize;
   const cols = Math.ceil(w / dw) + 2;
   const rows = Math.ceil(h / (dh * 0.5)) + 2;
   const inset = cellSize * 0.08;
@@ -217,7 +217,8 @@ function generateDiamond(w, h, rng, density) {
 function generateHoneycomb(w, h, rng, density) {
   const lines = [];
   const circles = [];
-  const hexR = Math.min(w, h) * (0.03 + (1 - density) * 0.05);
+  const arcs = [];
+  const hexR = Math.min(w, h) * (0.03 + (1 - density) * 0.05 + rng() * 0.015);
   const variation = rng() < 0.5 ? "partial" : "centerdot";
 
   const hexW = hexR * Math.sqrt(3);
@@ -261,18 +262,12 @@ function generateHoneycomb(w, h, rng, density) {
         // Gaps align with the 3 bridge spoke directions.
         const dotR = hexR * 0.2;
         const arcSpan = Math.PI * 2 / 3 * 0.85; // each arc slightly less than 120°
-        const segs = 6; // segments per arc
         for (let b = 0; b < 3; b++) {
           const bridgeAngle = (Math.PI / 3) * (b * 2) - Math.PI / 6 + Math.PI / 6; // midpoint angle of bridge sides
           const arcStart = bridgeAngle + (Math.PI * 2 / 3 - arcSpan) / 2;
-          for (let s = 0; s < segs; s++) {
-            const sa = arcStart + (arcSpan * s) / segs;
-            const ea = arcStart + (arcSpan * (s + 1)) / segs;
-            lines.push([
-              cx + dotR * Math.cos(sa), cy + dotR * Math.sin(sa),
-              cx + dotR * Math.cos(ea), cy + dotR * Math.sin(ea)
-            ]);
-          }
+          const arcEnd = arcStart + arcSpan;
+          // Add as proper arc instead of line segments
+          arcs.push([cx, cy, dotR, arcStart, arcEnd]);
         }
       } else {
         // Partial or standard — simple closed hex cutouts, no nesting issue
@@ -288,16 +283,16 @@ function generateHoneycomb(w, h, rng, density) {
     }
   }
 
-  return { lines, circles, arcs: [] };
+  return { lines, circles, arcs };
 }
 
 function generateChevron(w, h, rng, density) {
   const lines = [];
-  const cellSize = Math.min(w, h) * (0.05 + (1 - density) * 0.07);
+  const cellSize = Math.min(w, h) * (0.05 + (1 - density) * 0.07 + rng() * 0.02);
   const variation = rng() < 0.5 ? "nested" : "broken";
 
-  const chevW = cellSize * 1.5;
-  const chevH = cellSize;
+  const chevW = cellSize * (1.4 + rng() * 0.3);
+  const chevH = cellSize * (0.9 + rng() * 0.2);
   const cols = Math.ceil(w / chevW) + 2;
   const rows = Math.ceil(h / chevH) + 2;
 
@@ -401,9 +396,11 @@ function generateTriangle(w, h, rng, density) {
 function generateCircles(w, h, rng, density) {
   const lines = [];
   const circles = [];
-  const cellSize = Math.min(w, h) * (0.04 + (1 - density) * 0.06);
+  const arcs = [];
+  const cellSize = Math.min(w, h) * (0.04 + (1 - density) * 0.06 + rng() * 0.015);
   const variation = rng() < 0.5 ? "concentric" : "mixed";
   const hexPacked = rng() < 0.5;
+  const sizeVariation = 0.8 + rng() * 0.4; // random size multiplier
 
   const cols = Math.ceil(w / cellSize) + 2;
   const rows = Math.ceil(h / (hexPacked ? cellSize * 0.866 : cellSize)) + 2;
@@ -419,7 +416,7 @@ function generateCircles(w, h, rng, density) {
         // Concentric rings drawn as arcs with gaps at spoke positions.
         // Spokes are uncut radial strips connecting each ring outward.
         const webWidth = cellSize * 0.12;
-        const outerR = cellSize / 2 - webWidth / 2;
+        const outerR = (cellSize / 2 - webWidth / 2) * sizeVariation;
         const radii = [outerR, outerR * 0.6];
         if (rng() > 0.5) radii.push(outerR * 0.3);
 
@@ -431,22 +428,14 @@ function generateCircles(w, h, rng, density) {
             const nextSpokeAngle = (Math.PI * 2 * (sp + 1)) / numSpokes;
             const arcStart = spokeAngle + spokeGap;
             const arcEnd = nextSpokeAngle - spokeGap;
-            const arcSpan = arcEnd - arcStart;
-            const segs = Math.max(4, Math.ceil(arcSpan / 0.3));
-            for (let s = 0; s < segs; s++) {
-              const a1 = arcStart + (arcSpan * s) / segs;
-              const a2 = arcStart + (arcSpan * (s + 1)) / segs;
-              lines.push([
-                cx + ringR * Math.cos(a1), cy + ringR * Math.sin(a1),
-                cx + ringR * Math.cos(a2), cy + ringR * Math.sin(a2)
-              ]);
-            }
+            // Add as proper arc instead of line segments
+            arcs.push([cx, cy, ringR, arcStart, arcEnd]);
           }
         }
       } else {
         // Mixed sizes — single circle cutouts, no nesting issue
         const webWidth = cellSize * 0.12;
-        const maxRadius = cellSize / 2 - webWidth / 2;
+        const maxRadius = (cellSize / 2 - webWidth / 2) * sizeVariation;
         const isLarge = (r + c) % 2 === 0;
         const radius = isLarge ? maxRadius : maxRadius * 0.6;
         circles.push([cx, cy, radius]);
@@ -454,14 +443,14 @@ function generateCircles(w, h, rng, density) {
     }
   }
 
-  return { lines, circles, arcs: [] };
+  return { lines, circles, arcs };
 }
 
 function generateBasketweave(w, h, rng, density) {
   const lines = [];
-  const cellSize = Math.min(w, h) * (0.06 + (1 - density) * 0.08);
+  const cellSize = Math.min(w, h) * (0.06 + (1 - density) * 0.08 + rng() * 0.02);
   const variation = rng() < 0.5 ? "weave" : "rotated";
-  const webWidth = cellSize * 0.1;
+  const webWidth = cellSize * (0.08 + rng() * 0.04);
 
   const cols = Math.ceil(w / cellSize) + 1;
   const rows = Math.ceil(h / cellSize) + 1;
@@ -526,9 +515,9 @@ function generateBasketweave(w, h, rng, density) {
 
 function generateBrick(w, h, rng, density) {
   const lines = [];
-  const brickW = Math.min(w, h) * (0.08 + (1 - density) * 0.1);
-  const brickH = brickW * 0.45;
-  const webWidth = brickW * 0.1;
+  const brickW = Math.min(w, h) * (0.08 + (1 - density) * 0.1 + rng() * 0.025);
+  const brickH = brickW * (0.4 + rng() * 0.1);
+  const webWidth = brickW * (0.08 + rng() * 0.04);
   const variation = rng() < 0.5 ? "standard" : "soldier";
   const soldierInterval = 4 + Math.floor(rng() * 3);
 
