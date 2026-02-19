@@ -25,7 +25,7 @@ function isInsidePanel(x, y, w, h, shape) {
 
 function clipLinesToPanel(pattern, w, h, shape) {
   if (shape === "rectangle") return pattern;
-  const clipped = { lines: [], circles: [], arcs: pattern.arcs || [] };
+  const clipped = { lines: [], circles: [], arcs: pattern.arcs || [], fills: pattern.fills || [] };
 
   pattern.lines.forEach(([x1, y1, x2, y2]) => {
     if (isInsidePanel(x1, y1, w, h, shape) && isInsidePanel(x2, y2, w, h, shape)) {
@@ -146,7 +146,7 @@ const STYLES = [
     subStyles: ["slats","rectangular","diamond","honeycomb","chevron","triangle","circles","basketweave","brick"],
     generator: generateModernMinimalist },
   { id: "sacred", name: "Sacred Geometry", icon: "✦", color: "#8b5cf6",
-    subStyles: ["floweroflife","metatron","sriyantra","mandala","fibonacci","torus"],
+    subStyles: ["floweroflife","metatron","starwars","sriyantra","mandala","fibonacci","torus"],
     generator: generateSacredGeometry },
 ];
 
@@ -169,7 +169,11 @@ export default function PanelGenerator() {
   const [seed, setSeed] = useState(42);
   const [density, setDensity] = useState(0.5);
   const [showFrame, setShowFrame] = useState(true);
-  const [darkMode, setDarkMode] = useState(true);
+  const [patternColor, setPatternColor] = useState("#ff0000");  // Red (cut lines)
+  const [frameColor, setFrameColor] = useState("#000000");      // Black
+  const [bgColor, setBgColor] = useState("#ffffff");            // White
+  const [lineWidthMm, setLineWidthMm] = useState(2);
+  const [zoom, setZoom] = useState(1);
   const svgRef = useRef(null);
 
   const style = STYLES.find(s => s.id === selectedStyle);
@@ -197,6 +201,10 @@ export default function PanelGenerator() {
 
   const frameData = useMemo(() => getFrameLines(viewW, viewH, panelShape), [panelShape, viewW, viewH]);
   const framePath = useMemo(() => getFramePath(viewW, viewH, panelShape), [panelShape, viewW, viewH]);
+
+  // Convert line width from mm to SVG coordinate units
+  const panelWidthMm = unit === "mm" ? panelWidth : panelWidth * 25.4;
+  const svgStrokeWidth = lineWidthMm * (viewW / panelWidthMm);
 
   const regenerate = () => {
     const currentSignature = getVariationSignature(seed);
@@ -251,12 +259,10 @@ export default function PanelGenerator() {
     URL.revokeObjectURL(url);
   };
 
-  const bg = darkMode ? "#1a1a2e" : "#f8f9fa";
-  const fg = darkMode ? "#e0e0e0" : "#1a1a1a";
-  const cardBg = darkMode ? "#16213e" : "#ffffff";
-  const borderColor = darkMode ? "#2a2a4a" : "#dee2e6";
-  const patternColor = darkMode ? "#00d4ff" : "#2563eb";
-  const frameColor = darkMode ? "#ff6b35" : "#dc2626";
+  const bg = "#f8f9fa";
+  const fg = "#1a1a1a";
+  const cardBg = "#ffffff";
+  const borderColor = "#dee2e6";
 
   return (
     <div style={{ fontFamily: "'Inter', system-ui, sans-serif", background: bg, color: fg, minHeight: "100vh", padding: "20px" }}>
@@ -352,6 +358,47 @@ export default function PanelGenerator() {
                 onChange={e => setDensity(+e.target.value)}
                 style={{ width: "100%", marginTop: 4, accentColor: style?.color || "#8b5cf6" }} />
             </div>
+
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 2 }}>
+              <label style={{ fontSize: 11, opacity: 0.6, whiteSpace: "nowrap" }}>Line Width (mm)</label>
+              <input type="range" min="1" max="30" step="0.5" value={lineWidthMm}
+                onChange={e => setLineWidthMm(+e.target.value)}
+                style={{ flex: 1, accentColor: style?.color || "#8b5cf6" }} />
+              <input type="number" min="1" max="30" step="0.5" value={lineWidthMm}
+                onChange={e => setLineWidthMm(Math.min(30, Math.max(1, +e.target.value)))}
+                style={{ width: 52, padding: "4px 6px", borderRadius: 6, border: `1px solid ${borderColor}`, background: bg, color: fg, fontSize: 13, textAlign: "center" }} />
+            </div>
+          </div>
+
+          {/* Colors */}
+          <div style={{ background: cardBg, borderRadius: 12, padding: 16, border: `1px solid ${borderColor}` }}>
+            <h3 style={{ fontSize: 13, fontWeight: 600, textTransform: "uppercase", letterSpacing: 1, opacity: 0.7, margin: "0 0 12px" }}>Colors</h3>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+              {/* Pattern Color */}
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <label style={{ fontSize: 12, opacity: 0.7, minWidth: 80 }}>Pattern (cuts)</label>
+                <input type="color" value={patternColor} onChange={e => setPatternColor(e.target.value)}
+                  style={{ width: 60, height: 32, border: `1px solid ${borderColor}`, borderRadius: 6, cursor: "pointer" }} />
+                <span style={{ fontSize: 11, fontFamily: "monospace", opacity: 0.6 }}>{patternColor}</span>
+              </div>
+
+              {/* Frame Color */}
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <label style={{ fontSize: 12, opacity: 0.7, minWidth: 80 }}>Frame</label>
+                <input type="color" value={frameColor} onChange={e => setFrameColor(e.target.value)}
+                  style={{ width: 60, height: 32, border: `1px solid ${borderColor}`, borderRadius: 6, cursor: "pointer" }} />
+                <span style={{ fontSize: 11, fontFamily: "monospace", opacity: 0.6 }}>{frameColor}</span>
+              </div>
+
+              {/* Background Color */}
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <label style={{ fontSize: 12, opacity: 0.7, minWidth: 80 }}>Background</label>
+                <input type="color" value={bgColor} onChange={e => setBgColor(e.target.value)}
+                  style={{ width: 60, height: 32, border: `1px solid ${borderColor}`, borderRadius: 6, cursor: "pointer" }} />
+                <span style={{ fontSize: 11, fontFamily: "monospace", opacity: 0.6 }}>{bgColor}</span>
+              </div>
+            </div>
           </div>
 
           {/* Actions */}
@@ -387,10 +434,6 @@ export default function PanelGenerator() {
               <input type="checkbox" checked={showFrame} onChange={e => setShowFrame(e.target.checked)} />
               Show frame
             </label>
-            <label style={{ display: "flex", alignItems: "center", gap: 6, cursor: "pointer" }}>
-              <input type="checkbox" checked={darkMode} onChange={e => setDarkMode(e.target.checked)} />
-              Dark mode
-            </label>
             <span style={{ opacity: 0.5, marginLeft: "auto" }}>Seed: {seed}</span>
           </div>
         </div>
@@ -401,13 +444,25 @@ export default function PanelGenerator() {
             background: cardBg, borderRadius: 16, padding: 24, border: `1px solid ${borderColor}`,
             width: "100%", display: "flex", flexDirection: "column", alignItems: "center"
           }}>
-            <div style={{ fontSize: 13, fontWeight: 600, opacity: 0.7, marginBottom: 12, textTransform: "uppercase", letterSpacing: 1 }}>
-              Preview — {panelWidth}×{panelHeight} {unit}
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12, width: "100%" }}>
+              <div style={{ fontSize: 13, fontWeight: 600, opacity: 0.7, textTransform: "uppercase", letterSpacing: 1 }}>
+                Preview — {panelWidth}×{panelHeight} {unit}
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <button onClick={() => setZoom(z => Math.max(0.5, +(z - 0.25).toFixed(2)))}
+                  style={{ width: 28, height: 28, borderRadius: 6, border: `1px solid ${borderColor}`, background: "transparent", color: fg, fontSize: 16, cursor: "pointer", lineHeight: 1 }}>−</button>
+                <span style={{ fontSize: 12, opacity: 0.6, minWidth: 36, textAlign: "center" }}>{Math.round(zoom * 100)}%</span>
+                <button onClick={() => setZoom(z => Math.min(4, +(z + 0.25).toFixed(2)))}
+                  style={{ width: 28, height: 28, borderRadius: 6, border: `1px solid ${borderColor}`, background: "transparent", color: fg, fontSize: 16, cursor: "pointer", lineHeight: 1 }}>+</button>
+                <button onClick={() => setZoom(1)}
+                  style={{ padding: "0 8px", height: 28, borderRadius: 6, border: `1px solid ${borderColor}`, background: "transparent", color: fg, fontSize: 11, cursor: "pointer", opacity: zoom === 1 ? 0.4 : 1 }}>Reset</button>
+              </div>
             </div>
 
+            <div style={{ overflow: "auto", width: "100%", borderRadius: 8, border: `1px solid ${borderColor}` }}>
             <svg ref={svgRef} viewBox={`-10 -10 ${viewW + 20} ${viewH + 20}`}
-              width={Math.min(viewW + 20, 460)} height={Math.min(viewH + 20, 600)}
-              style={{ background: darkMode ? "#0a0a1a" : "#fff", borderRadius: 8, border: `1px solid ${borderColor}` }}>
+              width={(Math.min(viewW + 20, 460)) * zoom} height={(Math.min(viewH + 20, 600)) * zoom}
+              style={{ background: bgColor, display: "block" }}>
 
               {/* Clip path for panel shape */}
               <defs>
@@ -416,15 +471,34 @@ export default function PanelGenerator() {
                 </clipPath>
               </defs>
 
+              {/* Fills layer - black drops rendered BEHIND pattern */}
+              <g clipPath="url(#panelClip)">
+                {(pattern.fills || []).map((fill, i) => {
+                  if (fill.type === 'circle') {
+                    return <circle key={`f${i}`} cx={fill.cx} cy={fill.cy} r={fill.r}
+                                   fill="#000000" stroke="none" />;
+                  } else if (fill.type === 'rect') {
+                    return <rect key={`f${i}`} x={fill.x} y={fill.y}
+                                 width={fill.width} height={fill.height}
+                                 fill="#000000" stroke="none" />;
+                  } else if (fill.type === 'polygon') {
+                    const points = fill.points.map(([x,y]) => `${x},${y}`).join(' ');
+                    return <polygon key={`f${i}`} points={points}
+                                    fill="#000000" stroke="none" />;
+                  }
+                  return null;
+                })}
+              </g>
+
               {/* Pattern */}
-              <g clipPath="url(#panelClip)" opacity={0.8}>
+              <g clipPath="url(#panelClip)" opacity={0.8} strokeLinecap="round" strokeLinejoin="round">
                 {pattern.lines.map(([x1, y1, x2, y2], i) => (
                   <line key={`l${i}`} x1={x1} y1={y1} x2={x2} y2={y2}
-                    stroke={patternColor} strokeWidth={1} />
+                    stroke={patternColor} strokeWidth={svgStrokeWidth} />
                 ))}
                 {pattern.circles.map(([cx, cy, r], i) => (
                   <circle key={`c${i}`} cx={cx} cy={cy} r={r}
-                    stroke={patternColor} strokeWidth={1} fill="none" />
+                    stroke={patternColor} strokeWidth={svgStrokeWidth} fill="none" />
                 ))}
                 {pattern.arcs && pattern.arcs.map(([cx, cy, r, startAngle, endAngle], i) => {
                   const x1 = cx + r * Math.cos(startAngle);
@@ -437,7 +511,7 @@ export default function PanelGenerator() {
                   const d = `M ${x1} ${y1} A ${r} ${r} 0 ${largeArcFlag} 1 ${x2} ${y2}`;
                   return (
                     <path key={`a${i}`} d={d}
-                      stroke={patternColor} strokeWidth={1} fill="none" />
+                      stroke={patternColor} strokeWidth={svgStrokeWidth} fill="none" />
                   );
                 })}
               </g>
@@ -452,6 +526,7 @@ export default function PanelGenerator() {
                 {style?.name} • {panelWidth}×{panelHeight}{unit === "inches" ? '"' : "mm"} • seed:{seed}
               </text>
             </svg>
+            </div>
 
             <div style={{ marginTop: 12, fontSize: 11, opacity: 0.5, textAlign: "center" }}>
               {pattern.lines.length} lines • {pattern.circles.length} circles

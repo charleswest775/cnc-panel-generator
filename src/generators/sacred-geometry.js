@@ -173,48 +173,71 @@ function generateFlowerOfLife(w, h, rng, density, layoutMode) {
     }
   });
 
-  return { lines, circles: [], arcs };
+  return { lines, circles: [], arcs, fills: [] };
 }
 
-// 2. Metatron's Cube
-function generateMetatronsCube(w, h, rng, density, layoutMode) {
+// 2. Star Wars (originally mislabelled as Metatron's Cube — all-to-all connect pattern)
+function generateStarWars(w, h, rng, density, layoutMode) {
   const cx = w / 2;
   const cy = h / 2;
   const radius = Math.min(w, h) * 0.35 * (0.8 + density * 0.2);
-  const includeCircles = rng() < 0.5;
 
-  // Fruit of Life: 13 circles
-  const centers = [[cx, cy]]; // Center
+  // 13 centers: center + inner ring of 6 + outer ring of 6 offset by 30°
+  const centers = [[cx, cy]];
 
-  // Inner ring (6 circles)
   for (let i = 0; i < 6; i++) {
     const ang = (Math.PI * 2 * i) / 6;
     centers.push([cx + radius * Math.cos(ang), cy + radius * Math.sin(ang)]);
   }
-
-  // Outer ring (6 circles at intersections)
   for (let i = 0; i < 6; i++) {
     const ang = (Math.PI * 2 * i) / 6 + Math.PI / 6;
     centers.push([cx + radius * Math.cos(ang), cy + radius * Math.sin(ang)]);
   }
 
   const lines = [];
-
-  // Connect every center to every other center
   for (let i = 0; i < centers.length; i++) {
     for (let j = i + 1; j < centers.length; j++) {
       lines.push([centers[i][0], centers[i][1], centers[j][0], centers[j][1]]);
     }
   }
 
-  // Optionally include circles
-  const circles = [];
-  if (includeCircles) {
-    const circleR = radius * 0.12;
-    centers.forEach(([x, y]) => circles.push([x, y, circleR]));
+  return { lines, circles: [], arcs: [], fills: [] };
+}
+
+// 2b. Metatron's Cube (correct — Fruit of Life: 13 equal circles, all centers connected)
+function generateMetatronsCube(w, h, rng, density, layoutMode) {
+  const cx = w / 2;
+  const cy = h / 2;
+  // R = circle radius = center-to-center spacing so adjacent circles are tangent
+  // Outermost extent is 3R from center; fit within ~90% of half the shortest side
+  const R = Math.min(w, h) * 0.16 * (0.8 + density * 0.2);
+
+  // 13 centers: Fruit of Life
+  //   - center
+  //   - inner ring: 6 at distance R (angles 0°, 60°, ...)
+  //   - outer ring: 6 at distance 2R (same angles as inner ring)
+  const centers = [[cx, cy]];
+  for (let i = 0; i < 6; i++) {
+    const ang = (Math.PI * 2 * i) / 6;
+    centers.push([cx + R * Math.cos(ang), cy + R * Math.sin(ang)]);
+  }
+  for (let i = 0; i < 6; i++) {
+    const ang = (Math.PI * 2 * i) / 6;
+    centers.push([cx + 2 * R * Math.cos(ang), cy + 2 * R * Math.sin(ang)]);
   }
 
-  return { lines, circles, arcs: [] };
+  // All 78 connecting lines (every center to every other center)
+  const lines = [];
+  for (let i = 0; i < centers.length; i++) {
+    for (let j = i + 1; j < centers.length; j++) {
+      lines.push([centers[i][0], centers[i][1], centers[j][0], centers[j][1]]);
+    }
+  }
+
+  // 13 equal circles (radius R) at each center
+  const circles = centers.map(([x, y]) => [x, y, R]);
+
+  return { lines, circles, arcs: [], fills: [] };
 }
 
 // 3. Sri Yantra (Simplified)
@@ -245,7 +268,7 @@ function generateSriYantra(w, h, rng, density, layoutMode) {
   // Add outer circle using circle entity
   const circles = [[cx, cy, radius]];
 
-  return { lines, circles, arcs: [] };
+  return { lines, circles, arcs: [], fills: [] };
 }
 
 // 4. Radial Mandala (Generative)
@@ -334,7 +357,7 @@ function generateRadialMandala(w, h, rng, density, layoutMode) {
     }
   }
 
-  return { lines, circles, arcs };
+  return { lines, circles, arcs, fills: [] };
 }
 
 // 5. Golden Ratio / Fibonacci Spiral
@@ -407,7 +430,7 @@ function generateGoldenSpiral(w, h, rng, density, layoutMode) {
   const boundR = size * 0.7;
   const circles = [[cx, cy, boundR]];
 
-  return { lines, circles, arcs };
+  return { lines, circles, arcs, fills: [] };
 }
 
 // 6. Torus / Tube Torus
@@ -443,7 +466,7 @@ function generateTorus(w, h, rng, density, layoutMode) {
     }
   }
 
-  return { lines, circles: [], arcs };
+  return { lines, circles: [], arcs, fills: [] };
 }
 
 // ─── Main Entry Point ─────────────────────────────────────────────
@@ -451,6 +474,7 @@ function generateTorus(w, h, rng, density, layoutMode) {
 const SUBPATTERN_MAP = {
   floweroflife: generateFlowerOfLife,
   metatron: generateMetatronsCube,
+  starwars: generateStarWars,
   sriyantra: generateSriYantra,
   mandala: generateRadialMandala,
   fibonacci: generateGoldenSpiral,

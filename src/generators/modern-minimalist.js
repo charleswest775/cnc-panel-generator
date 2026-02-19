@@ -13,6 +13,7 @@ function createRNG(seed) {
 
 function generateSlats(w, h, rng, density) {
   const lines = [];
+  const fills = [];
   const cellSize = Math.min(w, h) * (0.03 + (1 - density) * 0.05);
   const barWidth = cellSize * (0.5 + rng() * 0.2); // randomize bar width
   const slotWidth = cellSize * (0.3 + rng() * 0.2); // randomize slot width
@@ -38,6 +39,7 @@ function generateSlats(w, h, rng, density) {
           lines.push([x2, y1, x2, y2]);
           lines.push([x2, y2, x1, y2]);
           lines.push([x1, y2, x1, y1]);
+          fills.push({ type: 'rect', x: x1, y: y1, width: x2 - x1, height: y2 - y1 });
         }
       }
     } else {
@@ -54,11 +56,12 @@ function generateSlats(w, h, rng, density) {
           lines.push([x2, y1, x2, y2]);
           lines.push([x2, y2, x1, y2]);
           lines.push([x1, y2, x1, y1]);
+          fills.push({ type: 'rect', x: x1, y: y1, width: x2 - x1, height: y2 - y1 });
         }
       }
     }
   } else {
-    // Tapered — slot width varies from thin to wide across the panel
+    // Tapered — slot width varies from thin to wide across the panel (no fills for open slots)
     if (horizontal) {
       const rows = Math.ceil(h / pitch) + 1;
       for (let r = 0; r < rows; r++) {
@@ -82,11 +85,12 @@ function generateSlats(w, h, rng, density) {
     }
   }
 
-  return { lines, circles: [], arcs: [] };
+  return { lines, circles: [], arcs: [], fills };
 }
 
 function generateRectangular(w, h, rng, density) {
   const lines = [];
+  const fills = [];
   const cellSize = Math.min(w, h) * (0.05 + (1 - density) * 0.07 + rng() * 0.02);
   const webWidth = cellSize * (0.12 + rng() * 0.06);
   const variation = rng() < 0.5 ? "nested" : "alternating";
@@ -120,7 +124,7 @@ function generateRectangular(w, h, rng, density) {
         lines.push([x, y + ch, x, my + bh]);
         lines.push([x, my - bh, x, y]);
 
-        // Inner nested rectangle with matching gaps
+        // Inner nested rectangle with matching gaps - fill this inner rectangle
         const inset = cw * 0.25;
         const ix = x + inset, iy = y + inset;
         const iw = cw - inset * 2, ih = ch - inset * 2;
@@ -138,9 +142,11 @@ function generateRectangular(w, h, rng, density) {
           // Left side
           lines.push([ix, iy + ih, ix, imy + bh]);
           lines.push([ix, imy - bh, ix, iy]);
+          // Fill inner rectangle
+          fills.push({ type: 'rect', x: ix, y: iy, width: iw, height: ih });
         }
       } else {
-        // Alternating sizes — single closed cutouts, no nesting issue
+        // Alternating sizes — single closed cutouts, fill all rectangles
         const isSmall = (r + c) % 2 === 0;
         const scale = isSmall ? 0.6 : 1.0;
         const aw = cw * scale;
@@ -151,15 +157,17 @@ function generateRectangular(w, h, rng, density) {
         lines.push([ax + aw, ay, ax + aw, ay + ah]);
         lines.push([ax + aw, ay + ah, ax, ay + ah]);
         lines.push([ax, ay + ah, ax, ay]);
+        fills.push({ type: 'rect', x: ax, y: ay, width: aw, height: ah });
       }
     }
   }
 
-  return { lines, circles: [], arcs: [] };
+  return { lines, circles: [], arcs: [], fills };
 }
 
 function generateDiamond(w, h, rng, density) {
   const lines = [];
+  const fills = [];
   const cellSize = Math.min(w, h) * (0.06 + (1 - density) * 0.08 + rng() * 0.02);
   const variation = rng() < 0.5 ? "elongated" : "double";
 
@@ -194,30 +202,50 @@ function generateDiamond(w, h, rng, density) {
         // Side L→T
         lines.push([cx - hw * (1 - g), cy - hh * g, cx - hw * g, cy - hh * (1 - g)]);
 
-        // Inner diamond — same gap pattern
+        // Inner diamond — same gap pattern, fill this one
         const ihw = hw * s, ihh = hh * s;
         lines.push([cx + ihw * g, cy - ihh + ihh * g, cx + ihw * (1 - g), cy - ihh * g]);
         lines.push([cx + ihw * (1 - g), cy + ihh * g, cx + ihw * g, cy + ihh * (1 - g)]);
         lines.push([cx - ihw * g, cy + ihh * (1 - g), cx - ihw * (1 - g), cy + ihh * g]);
         lines.push([cx - ihw * (1 - g), cy - ihh * g, cx - ihw * g, cy - ihh * (1 - g)]);
+        // Fill inner diamond
+        fills.push({
+          type: 'polygon',
+          points: [
+            [cx, cy - ihh],
+            [cx + ihw, cy],
+            [cx, cy + ihh],
+            [cx - ihw, cy]
+          ]
+        });
         // Uncut metal at the 4 cardinal points forms the bridges — no lines needed there.
       } else {
-        // Elongated — single diamond cutout, no nesting issue
+        // Elongated — single diamond cutout, fill it
         lines.push([cx, cy - hh, cx + hw, cy]);
         lines.push([cx + hw, cy, cx, cy + hh]);
         lines.push([cx, cy + hh, cx - hw, cy]);
         lines.push([cx - hw, cy, cx, cy - hh]);
+        fills.push({
+          type: 'polygon',
+          points: [
+            [cx, cy - hh],
+            [cx + hw, cy],
+            [cx, cy + hh],
+            [cx - hw, cy]
+          ]
+        });
       }
     }
   }
 
-  return { lines, circles: [], arcs: [] };
+  return { lines, circles: [], arcs: [], fills };
 }
 
 function generateHoneycomb(w, h, rng, density) {
   const lines = [];
   const circles = [];
   const arcs = [];
+  const fills = [];
   const hexR = Math.min(w, h) * (0.03 + (1 - density) * 0.05 + rng() * 0.015);
   const variation = rng() < 0.5 ? "partial" : "centerdot";
 
@@ -269,6 +297,8 @@ function generateHoneycomb(w, h, rng, density) {
           // Add as proper arc instead of line segments
           arcs.push([cx, cy, dotR, arcStart, arcEnd]);
         }
+        // Fill center dot
+        fills.push({ type: 'circle', cx, cy, r: dotR });
       } else {
         // Partial or standard — simple closed hex cutouts, no nesting issue
         for (let i = 0; i < 6; i++) {
@@ -283,7 +313,7 @@ function generateHoneycomb(w, h, rng, density) {
     }
   }
 
-  return { lines, circles, arcs };
+  return { lines, circles, arcs, fills };
 }
 
 function generateChevron(w, h, rng, density) {
@@ -330,11 +360,12 @@ function generateChevron(w, h, rng, density) {
     }
   }
 
-  return { lines, circles: [], arcs: [] };
+  return { lines, circles: [], arcs: [], fills: [] };
 }
 
 function generateTriangle(w, h, rng, density) {
   const lines = [];
+  const fills = [];
   const size = Math.min(w, h) * (0.05 + (1 - density) * 0.07);
   const variation = rng() < 0.5 ? "alternate" : "subdivided";
 
@@ -364,10 +395,20 @@ function generateTriangle(w, h, rng, density) {
           lines.push([mx01, my01, mx02, my02]);
           lines.push([mx02, my02, mx12, my12]);
           lines.push([mx12, my12, mx01, my01]);
+          // Fill center triangle
+          fills.push({
+            type: 'polygon',
+            points: [[mx01, my01], [mx02, my02], [mx12, my12]]
+          });
         } else {
           lines.push([x0, y0, x2, y2]);
           lines.push([x2, y2, x1, y1]);
           lines.push([x1, y1, x0, y0]);
+          // Fill triangle
+          fills.push({
+            type: 'polygon',
+            points: [[x0, y0], [x2, y2], [x1, y1]]
+          });
         }
       } else {
         const x0 = x + size * 0.5, y0 = y + rowH - inset;
@@ -381,22 +422,33 @@ function generateTriangle(w, h, rng, density) {
           lines.push([mx01, my01, mx02, my02]);
           lines.push([mx02, my02, mx12, my12]);
           lines.push([mx12, my12, mx01, my01]);
+          // Fill center triangle
+          fills.push({
+            type: 'polygon',
+            points: [[mx01, my01], [mx02, my02], [mx12, my12]]
+          });
         } else {
           lines.push([x0, y0, x2, y2]);
           lines.push([x2, y2, x1, y1]);
           lines.push([x1, y1, x0, y0]);
+          // Fill triangle
+          fills.push({
+            type: 'polygon',
+            points: [[x0, y0], [x2, y2], [x1, y1]]
+          });
         }
       }
     }
   }
 
-  return { lines, circles: [], arcs: [] };
+  return { lines, circles: [], arcs: [], fills };
 }
 
 function generateCircles(w, h, rng, density) {
   const lines = [];
   const circles = [];
   const arcs = [];
+  const fills = [];
   const cellSize = Math.min(w, h) * (0.04 + (1 - density) * 0.06 + rng() * 0.015);
   const variation = rng() < 0.5 ? "concentric" : "mixed";
   const hexPacked = rng() < 0.5;
@@ -432,22 +484,25 @@ function generateCircles(w, h, rng, density) {
             arcs.push([cx, cy, ringR, arcStart, arcEnd]);
           }
         }
+        // No fills for concentric (bridged rings)
       } else {
-        // Mixed sizes — single circle cutouts, no nesting issue
+        // Mixed sizes — single circle cutouts, fill all circles
         const webWidth = cellSize * 0.12;
         const maxRadius = (cellSize / 2 - webWidth / 2) * sizeVariation;
         const isLarge = (r + c) % 2 === 0;
         const radius = isLarge ? maxRadius : maxRadius * 0.6;
         circles.push([cx, cy, radius]);
+        fills.push({ type: 'circle', cx, cy, r: radius });
       }
     }
   }
 
-  return { lines, circles, arcs };
+  return { lines, circles, arcs, fills };
 }
 
 function generateBasketweave(w, h, rng, density) {
   const lines = [];
+  const fills = [];
   const cellSize = Math.min(w, h) * (0.06 + (1 - density) * 0.08 + rng() * 0.02);
   const variation = rng() < 0.5 ? "weave" : "rotated";
   const webWidth = cellSize * (0.08 + rng() * 0.04);
@@ -473,6 +528,7 @@ function generateBasketweave(w, h, rng, density) {
             lines.push([rx + rw, ry, rx + rw, ry + rh]);
             lines.push([rx + rw, ry + rh, rx, ry + rh]);
             lines.push([rx, ry + rh, rx, ry]);
+            fills.push({ type: 'rect', x: rx, y: ry, width: rw, height: rh });
           }
         } else {
           const rw2 = (cellSize - webWidth * (rectCount + 1)) / rectCount;
@@ -484,6 +540,7 @@ function generateBasketweave(w, h, rng, density) {
             lines.push([rx + rw2, ry, rx + rw2, ry + rh2]);
             lines.push([rx + rw2, ry + rh2, rx, ry + rh2]);
             lines.push([rx, ry + rh2, rx, ry]);
+            fills.push({ type: 'rect', x: rx, y: ry, width: rw2, height: rh2 });
           }
         }
       } else {
@@ -506,15 +563,26 @@ function generateBasketweave(w, h, rng, density) {
         lines.push([ccx - half * g, ccy + half * (1 - g), ccx - half * (1 - g), ccy + half * g]);
         // Side L→T
         lines.push([ccx - half * (1 - g), ccy - half * g, ccx - half * g, ccy - half * (1 - g)]);
+        // Fill rotated square (diamond)
+        fills.push({
+          type: 'polygon',
+          points: [
+            [ccx, ccy - half],
+            [ccx + half, ccy],
+            [ccx, ccy + half],
+            [ccx - half, ccy]
+          ]
+        });
       }
     }
   }
 
-  return { lines, circles: [], arcs: [] };
+  return { lines, circles: [], arcs: [], fills };
 }
 
 function generateBrick(w, h, rng, density) {
   const lines = [];
+  const fills = [];
   const brickW = Math.min(w, h) * (0.08 + (1 - density) * 0.1 + rng() * 0.025);
   const brickH = brickW * (0.4 + rng() * 0.1);
   const webWidth = brickW * (0.08 + rng() * 0.04);
@@ -542,6 +610,7 @@ function generateBrick(w, h, rng, density) {
         lines.push([x + bw, y, x + bw, y + bh]);
         lines.push([x + bw, y + bh, x, y + bh]);
         lines.push([x, y + bh, x, y]);
+        fills.push({ type: 'rect', x, y, width: bw, height: bh });
       }
     } else {
       for (let c = -1; c < cols; c++) {
@@ -553,11 +622,12 @@ function generateBrick(w, h, rng, density) {
         lines.push([x + bw, y, x + bw, y + bh]);
         lines.push([x + bw, y + bh, x, y + bh]);
         lines.push([x, y + bh, x, y]);
+        fills.push({ type: 'rect', x, y, width: bw, height: bh });
       }
     }
   }
 
-  return { lines, circles: [], arcs: [] };
+  return { lines, circles: [], arcs: [], fills };
 }
 
 // ─── Deduplication utility ────────────────────────────────────
